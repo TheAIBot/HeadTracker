@@ -11,15 +11,14 @@ namespace HeadTracker
 {
     class ColorClusterCreator
     {
-        public readonly List<ColorCluster> clusters = new List<ColorCluster>();
+        public readonly List<ColorCluster> clusters;
 
         public ColorClusterCreator(Bitmap image)
         {
-            CreateClusters(image);
-            clusters.RemoveAll(x => x.ClusterSize <= 10);
+            clusters = CreateClusters(image);
         }
 
-        private void CreateClusters(Bitmap image)
+        private List<ColorCluster> CreateClusters(Bitmap image)
         {
             PixelTypeInfo pixelInfo = PixelInfo.GetPixelTypeInfo(image);
             int pixelSize = pixelInfo.pixelSize;
@@ -27,6 +26,8 @@ namespace HeadTracker
             Rectangle imageSize = new Rectangle(0, 0, image.Width, image.Height);
 
             BitmapData originalBitmapData = image.LockBits(imageSize, ImageLockMode.ReadOnly, image.PixelFormat);
+
+            Dictionary<ColorCluster, bool> createdClusters = new Dictionary<ColorCluster, bool>();
 
             ColorCluster[] previousRowClusters = new ColorCluster[image.Width];
             ColorCluster[] currentRowClusters = new ColorCluster[image.Width];
@@ -67,7 +68,7 @@ namespace HeadTracker
 
                             currentRowPixels[z] = currentPixelColor;
 
-                            const int MAX_PIXEL_DIFFERENCE = 8;
+                            const int MAX_PIXEL_DIFFERENCE = 3;
 
                             //This giant nested if is a clusterfuck but i currently don't
                             //know how to make it better.
@@ -137,7 +138,7 @@ namespace HeadTracker
                             createCluster:
                             ColorCluster newCluster = new ColorCluster();
                             currentRowClusters[z] = newCluster;
-                            clusters.Add(newCluster);
+                            createdClusters.Add(newCluster, true);
                             goto end;
 
                             usePreviousAboveCluster:
@@ -149,32 +150,25 @@ namespace HeadTracker
                             goto end;
 
                             combineClusters:
-                            ColorCluster combinedCluster = currentRowClusters[z - 1].CombineWith(previousRowClusters[z]);
-                            ColorCluster clusterAToRemove = currentRowClusters[z - 1];
+                            currentRowClusters[z - 1].AddCluster(previousRowClusters[z]);
                             ColorCluster clusterBToRemove = previousRowClusters[z];
                             for (int q = 0; q < currentRowClusters.Length; q++)
                             {
-                                if (currentRowClusters[q] == clusterAToRemove)
+                                if (currentRowClusters[q] == clusterBToRemove)
                                 {
-                                    currentRowClusters[q] = combinedCluster;
-                                }
-                                else if (currentRowClusters[q] == clusterBToRemove)
-                                {
-                                    currentRowClusters[q] = combinedCluster;
+                                    currentRowClusters[q] = currentRowClusters[z - 1];
                                 }
                             }
                             for (int q = 0; q < previousRowClusters.Length; q++)
                             {
                                 if (previousRowClusters[q] == clusterBToRemove)
                                 {
-                                    previousRowClusters[q] = combinedCluster;
+                                    previousRowClusters[q] = currentRowClusters[z - 1];
                                 }
                             }
-                            clusters.Remove(clusterAToRemove);
-                            clusters.Remove(clusterBToRemove);
-
-                            clusters.Add(combinedCluster);
-                            currentRowClusters[z] = combinedCluster;
+                            createdClusters[clusterBToRemove] = false;
+                            
+                            currentRowClusters[z] = currentRowClusters[z - 1];
                             goto end;
 
                             end:
@@ -199,6 +193,8 @@ namespace HeadTracker
                 }
             }
             image.UnlockBits(originalBitmapData);
+
+            return createdClusters.Keys.ToList();
         }
     }
 }

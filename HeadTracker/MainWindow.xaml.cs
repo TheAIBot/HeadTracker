@@ -40,10 +40,13 @@ namespace HeadTracker
             {
                 colors.Add(System.Drawing.Color.FromKnownColor((KnownColor)colorValue));
             }
-            Bitmap test = new Bitmap("test.png");
+            Bitmap test = new Bitmap("test3.png");
             Stopwatch w = new Stopwatch();
             w.Start();
             ColorClusterCreator ct = new ColorClusterCreator(test);
+            w.Stop();
+            MessageBox.Show(w.ElapsedMilliseconds.ToString());
+            /*
             for (int i = 0; i < ct.clusters.Count; i++)
             {
                 ColorCluster cluster = ct.clusters[i];
@@ -58,10 +61,8 @@ namespace HeadTracker
                     
                 }
             }
-            w.Stop();
-            MessageBox.Show(w.ElapsedMilliseconds.ToString());
-            //ct.clusters.ForEach(x => x.ColorPoints.ForEach(y => test.SetPixel(y.x, y.y, System.Drawing.Color.Blue)));
-            test.Save("testResult.png");
+            */
+            test.Save("testResult3.png");
             
 
             FilterInfoCollection videoSources = new FilterInfoCollection(FilterCategory.VideoInputDevice);

@@ -9,12 +9,13 @@ namespace HeadTracker
 {
     public class ColorCluster
     {
-        public readonly List<PixelStretch> PixelStretches = new List<PixelStretch>();
+        private readonly List<List<PixelStretch>> PixelStretches = new List<List<PixelStretch>>();
         public int ClusterSize = 0;
         public Point CenterPoint;
 
         public ColorCluster()
         {
+            PixelStretches.Add(new List<PixelStretch>());
         }
 
         public void Init()
@@ -36,7 +37,7 @@ namespace HeadTracker
 
         public void AddPixels(PixelStretch pixelStretch)
         {
-            PixelStretches.Add(pixelStretch);
+            PixelStretches[0].Add(pixelStretch);
 
             //If the pixel stretch is 1 long then startX == endX, but
             //there is still 1 pixel inside the stretch so add 1 to show that.
