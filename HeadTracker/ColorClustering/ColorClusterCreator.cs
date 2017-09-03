@@ -47,24 +47,14 @@ namespace HeadTracker
                     {
                         
                         byte* firstPixelStretchPtr = originalRowPtr + (x * pixelSize);
-
-                        int firstPixelRed = PixelInfo.GetPixelColorAsInt(firstPixelStretchPtr, RGBAColor.Red, pixelInfo);
-                        int firstPixelGreen = PixelInfo.GetPixelColorAsInt(firstPixelStretchPtr, RGBAColor.Green, pixelInfo);
-                        int firstPixelBlue = PixelInfo.GetPixelColorAsInt(firstPixelStretchPtr, RGBAColor.Blue, pixelInfo);
-                        
-                        PixelColor prevPixelColor = new PixelColor(firstPixelRed, firstPixelGreen, firstPixelBlue);
+                        PixelColor prevPixelColor = PixelInfo.GetPixelColorAsPixelColor(firstPixelStretchPtr, pixelInfo);
 
                         Boolean isStretchClosed = false;
 
                         for (int z = x; z < originalBitmapData.Width; z++)
                         {
                             byte* pixelPtr = originalRowPtr + ((z) * pixelSize);
-
-                            int pixelRed = PixelInfo.GetPixelColorAsInt(pixelPtr, RGBAColor.Red, pixelInfo);
-                            int pixelGreen = PixelInfo.GetPixelColorAsInt(pixelPtr, RGBAColor.Green, pixelInfo);
-                            int pixelBlue = PixelInfo.GetPixelColorAsInt(pixelPtr, RGBAColor.Blue, pixelInfo);
-
-                            PixelColor currentPixelColor = new PixelColor(pixelRed, pixelGreen, pixelBlue);
+                            PixelColor currentPixelColor = PixelInfo.GetPixelColorAsPixelColor(pixelPtr, pixelInfo);
 
                             currentRowPixels[z] = currentPixelColor;
 
@@ -194,7 +184,7 @@ namespace HeadTracker
             }
             image.UnlockBits(originalBitmapData);
 
-            return createdClusters.Keys.ToList();
+            return createdClusters.Where(x => x.Value).Select(x => x.Key).ToList();
         }
     }
 }

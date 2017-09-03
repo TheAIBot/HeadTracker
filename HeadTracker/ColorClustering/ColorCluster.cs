@@ -9,7 +9,7 @@ namespace HeadTracker
 {
     public class ColorCluster
     {
-        private readonly List<List<PixelStretch>> PixelStretches = new List<List<PixelStretch>>();
+        public readonly List<List<PixelStretch>> PixelStretches = new List<List<PixelStretch>>();
         public int ClusterSize = 0;
         public Point CenterPoint;
 

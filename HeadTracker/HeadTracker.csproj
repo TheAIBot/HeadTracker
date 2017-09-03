@@ -67,7 +67,6 @@
     <Compile Include="ColorClustering\ColorCluster.cs" />
     <Compile Include="ColorClustering\ColorClusterCreator.cs" />
     <Compile Include="ColorPoint.cs" />
-    <Compile Include="ColorClustering\PixelColor.cs" />
     <Compile Include="ColorClustering\PixelStretch.cs" />
     <Compile Include="Tracker.cs" />
     <Page Include="InfoWindow.xaml">

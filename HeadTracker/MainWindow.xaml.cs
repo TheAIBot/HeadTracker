@@ -46,22 +46,28 @@ namespace HeadTracker
             ColorClusterCreator ct = new ColorClusterCreator(test);
             w.Stop();
             MessageBox.Show(w.ElapsedMilliseconds.ToString());
-            /*
+            
             for (int i = 0; i < ct.clusters.Count; i++)
             {
                 ColorCluster cluster = ct.clusters[i];
+                if (cluster.ClusterSize <= 10)
+                {
+                    continue;
+                }
                 System.Drawing.Color color = colors[i % colors.Count];
 
-                foreach (PixelStretch stretch in cluster.PixelStretches)
+                foreach (List<PixelStretch> listStretches in cluster.PixelStretches)
                 {
-                    for (int x = stretch.startX; x <= stretch.endX; x++)
+                    foreach (PixelStretch stretch in listStretches)
                     {
-                        test.SetPixel(x, stretch.y, color);
+                        for (int x = stretch.startX; x <= stretch.endX; x++)
+                        {
+                            test.SetPixel(x, stretch.y, color);
+                        }
                     }
-                    
                 }
             }
-            */
+            
             test.Save("testResult3.png");
             
 
