@@ -15,10 +15,37 @@ namespace HeadTracker
 
         public ColorClusterCreator(Bitmap image)
         {
-            clusters = CreateClusters(image);
+            var result = CreateClusters(image);
+            List<ColorCluster> createdClusters = result.foundClusters;
+            createdClusters = createdClusters.OrderByDescending(x => x.ClusterSize).ToList();
+
+            //need to merge the smaller clusters into bigger clusters 
+            HashSet<ColorCluster> removedClusters = result.invalidClusters;
+            const int requiredPixels = 400;
+
+            for (int i = createdClusters.Count - 1; i >= 0; i--)
+            {
+                ColorCluster cluster = createdClusters[i];
+
+                if (cluster.ClusterSize >= requiredPixels)
+                {
+                    continue;
+                }
+
+                ColorCluster bestMatch = cluster.GetBestMatchingSurroundingCluster(removedClusters);
+                if (bestMatch == null)
+                {
+                    continue;
+                }
+                removedClusters.Add(cluster);
+                bestMatch.AddCluster(cluster);
+            }
+
+            createdClusters.RemoveAll(x => x.ClusterSize < requiredPixels);
+            clusters = createdClusters;
         }
 
-        private List<ColorCluster> CreateClusters(Bitmap image)
+        private (List<ColorCluster> foundClusters, HashSet<ColorCluster> invalidClusters) CreateClusters(Bitmap image)
         {
             PixelTypeInfo pixelInfo = PixelInfo.GetPixelTypeInfo(image);
             int pixelSize = pixelInfo.pixelSize;
@@ -28,6 +55,8 @@ namespace HeadTracker
             BitmapData originalBitmapData = image.LockBits(imageSize, ImageLockMode.ReadOnly, image.PixelFormat);
 
             Dictionary<ColorCluster, bool> createdClusters = new Dictionary<ColorCluster, bool>();
+
+            HashSet<ColorCluster> invalidClusters = new HashSet<ColorCluster>();
 
             ColorCluster[] previousRowClusters = new ColorCluster[image.Width];
             ColorCluster[] currentRowClusters = new ColorCluster[image.Width];
@@ -49,12 +78,20 @@ namespace HeadTracker
                         byte* firstPixelStretchPtr = originalRowPtr + (x * pixelSize);
                         PixelColor prevPixelColor = PixelInfo.GetPixelColorAsPixelColor(firstPixelStretchPtr, pixelInfo);
 
+                        int stretchRed = 0;
+                        int stretchGreen = 0;
+                        int stretchBlue = 0;
+
                         Boolean isStretchClosed = false;
 
                         for (int z = x; z < originalBitmapData.Width; z++)
                         {
-                            byte* pixelPtr = originalRowPtr + ((z) * pixelSize);
+                            byte* pixelPtr = originalRowPtr + (z * pixelSize);
                             PixelColor currentPixelColor = PixelInfo.GetPixelColorAsPixelColor(pixelPtr, pixelInfo);
+
+                            stretchRed += currentPixelColor.red;
+                            stretchGreen += currentPixelColor.green;
+                            stretchBlue += currentPixelColor.blue;
 
                             currentRowPixels[z] = currentPixelColor;
 
@@ -115,9 +152,14 @@ namespace HeadTracker
                             }
 
                             endStretch:
+                            //this pixel isn't part of the stretch so remove its color value
+                            stretchRed -= currentPixelColor.red;
+                            stretchGreen -= currentPixelColor.green;
+                            stretchBlue -= currentPixelColor.blue;
+
                             //z - 1 because this pixel isn't part of this cluster.
                             PixelStretch stretch = new PixelStretch(x, z - 1, y);
-                            currentRowClusters[z - 1].AddPixels(stretch);
+                            currentRowClusters[z - 1].AddPixels(stretch, stretchRed, stretchGreen, stretchBlue);
                             isStretchClosed = true;
 
                             //set x to this pixels position and break, so a new pixel stretch can
@@ -157,18 +199,38 @@ namespace HeadTracker
                                 }
                             }
                             createdClusters[clusterBToRemove] = false;
-                            
+                            invalidClusters.Add(clusterBToRemove);
+
                             currentRowClusters[z] = currentRowClusters[z - 1];
                             goto end;
 
                             end:
+                            //now add surrounding clusters to the current cluster and those surrounding it
+
+                            //if first pixel in stretch and there is a pixel to the left
+                            if (z == x && z > 0)
+                            {
+                                //add left cluster to right surrounding clusters
+                                currentRowClusters[z].AddSurroundingCluster(currentRowClusters[z - 1]);
+                                //add right cluster to left surrounding clusters
+                                currentRowClusters[z - 1].AddSurroundingCluster(currentRowClusters[z]);
+                            }
+                            //if there is a pixel above
+                            if (y > 0)
+                            {
+                                //add top cluster to bottom surrounding clusters
+                                currentRowClusters[z].AddSurroundingCluster(previousRowClusters[z]);
+                                //add bottom cluster to top surrounding clusters
+                                previousRowClusters[z].AddSurroundingCluster(currentRowClusters[z]);
+                            }
+
                             prevPixelColor = currentPixelColor;
                         }
 
                         if (!isStretchClosed)
                         {
                             PixelStretch stretch = new PixelStretch(x, originalBitmapData.Width - 1, y);
-                            currentRowClusters[originalBitmapData.Width - 1].AddPixels(stretch);
+                            currentRowClusters[originalBitmapData.Width - 1].AddPixels(stretch, stretchRed, stretchGreen, stretchBlue);
                             break;
                         }
                     }
@@ -184,7 +246,7 @@ namespace HeadTracker
             }
             image.UnlockBits(originalBitmapData);
 
-            return createdClusters.Where(x => x.Value).Select(x => x.Key).ToList();
+            return (createdClusters.Where(x => x.Value).Select(x => x.Key).ToList(), invalidClusters);
         }
     }
 }

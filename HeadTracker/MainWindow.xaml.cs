@@ -6,6 +6,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -35,6 +36,7 @@ namespace HeadTracker
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            
             List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
             foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
             {
@@ -43,17 +45,17 @@ namespace HeadTracker
             Bitmap test = new Bitmap("test3.png");
             Stopwatch w = new Stopwatch();
             w.Start();
-            ColorClusterCreator ct = new ColorClusterCreator(test);
+            ColorClusterCreator ct = null;
+            for (int i = 0; i < 5; i++)
+            {
+                ct = new ColorClusterCreator(test);
+            }
+
             w.Stop();
             MessageBox.Show(w.ElapsedMilliseconds.ToString());
-            
             for (int i = 0; i < ct.clusters.Count; i++)
             {
                 ColorCluster cluster = ct.clusters[i];
-                if (cluster.ClusterSize <= 10)
-                {
-                    continue;
-                }
                 System.Drawing.Color color = colors[i % colors.Count];
 
                 foreach (List<PixelStretch> listStretches in cluster.PixelStretches)
@@ -69,6 +71,7 @@ namespace HeadTracker
             }
             
             test.Save("testResult3.png");
+            MessageBox.Show(w.ElapsedMilliseconds.ToString());
             
 
             FilterInfoCollection videoSources = new FilterInfoCollection(FilterCategory.VideoInputDevice);
@@ -107,38 +110,43 @@ namespace HeadTracker
                 videoSource.SignalToStop();
             }
         }
+        SemaphoreSlim ss = new SemaphoreSlim(4);
 
         private void videoSource_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
         {
             try
             {
                 //Cast the frame as Bitmap object and don't forget to use ".Clone()" otherwise
+                Bitmap TempBitmap = (Bitmap)eventArgs.Frame.Clone();
                 //you'll probably get access violation exceptions
                 watch.Reset();
                 watch.Start();
-                Bitmap TempBitmap = (Bitmap)eventArgs.Frame.Clone();
+
                 TempBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
 
-                /*
-                ColorClusterCreator blackClusters  = new ColorClusterCreator(TempBitmap, 0  , 0  , 0);
-                ColorClusterCreator redClusters    = new ColorClusterCreator(TempBitmap, 255, 0  , 0);
-                ColorClusterCreator greenClusters  = new ColorClusterCreator(TempBitmap, 0  , 255, 0);
-                ColorClusterCreator blueClusters   = new ColorClusterCreator(TempBitmap, 0  , 0  , 255);
-                ColorClusterCreator orangeClusters = new ColorClusterCreator(TempBitmap, 255, 127, 0);
+                ColorClusterCreator ct = new ColorClusterCreator(TempBitmap);
 
-                try
+                List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
+                foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
                 {
-                    using (Graphics g = Graphics.FromImage(TempBitmap))
+                    colors.Add(System.Drawing.Color.FromKnownColor((KnownColor)colorValue));
+                }
+                for (int i = 0; i < ct.clusters.Count; i++)
+                {
+                    ColorCluster cluster = ct.clusters[i];
+                    System.Drawing.Color color = colors[i % colors.Count];
+
+                    foreach (List<PixelStretch> listStretches in cluster.PixelStretches)
                     {
-                        System.Drawing.Pen pen = new System.Drawing.Pen(System.Drawing.Color.Cyan, 10);
-                        g.DrawEllipse(pen, blackClusters.clusters.First().CenterPoint.X, blackClusters.clusters.First().CenterPoint.Y, 10, 10);
+                        foreach (PixelStretch stretch in listStretches)
+                        {
+                            for (int x = stretch.startX; x <= stretch.endX; x++)
+                            {
+                                TempBitmap.SetPixel(x, stretch.y, color);
+                            }
+                        }
                     }
                 }
-                catch (Exception e)
-                {
-                    throw;
-                }
-                */
 
                 Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(TempBitmap));
 
