@@ -10,8 +10,10 @@ namespace HeadTracker
 {
     public class ColorCluster
     {
-        public readonly List<List<PixelStretch>> PixelStretches = new List<List<PixelStretch>>();
-        private readonly List<HashSet<ColorCluster>> SurroundingClusters = new List<HashSet<ColorCluster>>();
+        public readonly List<PixelStretch> PixelStretches = new List<PixelStretch>();
+        private readonly HashSet<ColorCluster> SurroundingClusters = new HashSet<ColorCluster>();
+        private readonly List<ColorCluster> SuperClusterOverTheseClusters = new List<ColorCluster>();
+        public int SurroundingClustersCount = 0;
         public long Red = 0;
         public long Green = 0;
         public long Blue = 0;
@@ -21,8 +23,6 @@ namespace HeadTracker
 
         public ColorCluster()
         {
-            PixelStretches.Add(new List<PixelStretch>());
-            SurroundingClusters.Add(new HashSet<ColorCluster>());
         }
 
         public void Init()
@@ -44,7 +44,7 @@ namespace HeadTracker
 
         public void AddPixels(PixelStretch pixelStretch, int red, int green, int blue)
         {
-            PixelStretches[0].Add(pixelStretch);
+            PixelStretches.Add(pixelStretch);
 
             //If the pixel stretch is 1 long then startX == endX, but
             //there is still 1 pixel inside the stretch so add 1 to show that.
@@ -58,9 +58,9 @@ namespace HeadTracker
 
         public void AddCluster(ColorCluster cluster)
         {
-            PixelStretches.AddRange(cluster.PixelStretches);
+            SuperClusterOverTheseClusters.Add(cluster);
+            SurroundingClustersCount += cluster.SurroundingClustersCount;
             ClusterSize += cluster.ClusterSize;
-            SurroundingClusters.AddRange(cluster.SurroundingClusters);
 
             this.Red += cluster.Red;
             this.Green += cluster.Green;
@@ -83,27 +83,72 @@ namespace HeadTracker
             ColorCluster bestCluster = null;
             int bestDistance = int.MaxValue;
 
-            foreach (HashSet<ColorCluster> surClusters in SurroundingClusters)
+            foreach (ColorCluster subCluster in GetSurroundingClusters())
             {
-                foreach (ColorCluster subCluster in surClusters)
+                ColorCluster cluster = subCluster.GetSuperCluster();
+
+                if (cluster == this)
                 {
-                    ColorCluster cluster = subCluster.GetSuperCluster();
+                    continue;
+                }
 
-                    if (/*removedClusters.Contains(cluster) || */cluster == this)
-                    {
-                        continue;
-                    }
-
-                    int distance = colorToMatch.Distance(cluster.GetColorOfCluster());
-                    if (distance < bestDistance || bestCluster == null)
-                    {
-                        bestCluster = cluster;
-                        bestDistance = distance;
-                    }
+                int distance = colorToMatch.Distance(cluster.GetColorOfCluster());
+                if (distance < bestDistance || bestCluster == null)
+                {
+                    bestCluster = cluster;
+                    bestDistance = distance;
                 }
             }
 
             return bestCluster;
+        }
+
+        public ColorCluster[] GetSurroundingClusters()
+        {
+            int newI;
+            return GetSurroundingClusters(0, new ColorCluster[SurroundingClustersCount], out newI);
+        }
+        public ColorCluster[] GetSurroundingClusters(int i, ColorCluster[] surClusters, out int newI)
+        {
+            foreach (ColorCluster cluster in SurroundingClusters)
+            {
+                surClusters[i] = cluster;
+                i++;
+            }
+
+            foreach (ColorCluster cluster in SuperClusterOverTheseClusters)
+            {
+                int newnewI = 0;
+                cluster.GetSurroundingClusters(i, surClusters, out newnewI);
+                i = newnewI;
+            }
+
+            newI = i;
+            return surClusters;
+        }
+
+        public List<List<PixelStretch>> GetPixelStretches()
+        {
+            List<List<PixelStretch>> allPixelStretches = new List<List<PixelStretch>>();
+            allPixelStretches.Add(PixelStretches);
+
+            foreach (ColorCluster cluster in SuperClusterOverTheseClusters)
+            {
+                cluster.GetPixelStretches(allPixelStretches);
+            }
+
+            return allPixelStretches;
+        }
+        public List<List<PixelStretch>> GetPixelStretches(List<List<PixelStretch>> allPixelStretches)
+        {
+            allPixelStretches.Add(PixelStretches);
+
+            foreach (ColorCluster cluster in SuperClusterOverTheseClusters)
+            {
+                cluster.GetPixelStretches(allPixelStretches);
+            }
+
+            return allPixelStretches;
         }
 
         public ColorCluster GetSuperCluster()
@@ -120,7 +165,10 @@ namespace HeadTracker
 
         public void AddSurroundingCluster(ColorCluster cluster)
         {
-            SurroundingClusters[0].Add(cluster);
+            if (SurroundingClusters.Add(cluster))
+            {
+                SurroundingClustersCount++;
+            }            
         }
     }
 }

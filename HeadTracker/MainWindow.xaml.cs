@@ -58,7 +58,7 @@ namespace HeadTracker
                 ColorCluster cluster = ct.clusters[i];
                 System.Drawing.Color color = colors[i % colors.Count];
 
-                foreach (List<PixelStretch> listStretches in cluster.PixelStretches)
+                foreach (List<PixelStretch> listStretches in cluster.GetPixelStretches())
                 {
                     foreach (PixelStretch stretch in listStretches)
                     {
@@ -136,7 +136,7 @@ namespace HeadTracker
                     ColorCluster cluster = ct.clusters[i];
                     System.Drawing.Color color = colors[i % colors.Count];
 
-                    foreach (List<PixelStretch> listStretches in cluster.PixelStretches)
+                    foreach (List<PixelStretch> listStretches in cluster.GetPixelStretches())
                     {
                         foreach (PixelStretch stretch in listStretches)
                         {
