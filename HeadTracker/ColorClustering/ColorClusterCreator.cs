@@ -15,12 +15,10 @@ namespace HeadTracker
 
         public ColorClusterCreator(Bitmap image)
         {
-            var result = CreateClusters(image);
-            List<ColorCluster> createdClusters = result.foundClusters;
+            List<ColorCluster> createdClusters = CreateClusters(image);
             createdClusters = createdClusters.OrderByDescending(x => x.ClusterSize).ToList();
 
             //need to merge the smaller clusters into bigger clusters 
-            HashSet<ColorCluster> removedClusters = result.invalidClusters;
             const int requiredPixels = 400;
 
             for (int i = createdClusters.Count - 1; i >= 0; i--)
@@ -32,12 +30,11 @@ namespace HeadTracker
                     continue;
                 }
 
-                ColorCluster bestMatch = cluster.GetBestMatchingSurroundingCluster(removedClusters);
+                ColorCluster bestMatch = cluster.GetBestMatchingSurroundingCluster();
                 if (bestMatch == null)
                 {
                     continue;
                 }
-                removedClusters.Add(cluster);
                 bestMatch.AddCluster(cluster);
             }
 
@@ -45,7 +42,7 @@ namespace HeadTracker
             clusters = createdClusters;
         }
 
-        private (List<ColorCluster> foundClusters, HashSet<ColorCluster> invalidClusters) CreateClusters(Bitmap image)
+        private List<ColorCluster> CreateClusters(Bitmap image)
         {
             PixelTypeInfo pixelInfo = PixelInfo.GetPixelTypeInfo(image);
             int pixelSize = pixelInfo.pixelSize;
@@ -55,8 +52,6 @@ namespace HeadTracker
             BitmapData originalBitmapData = image.LockBits(imageSize, ImageLockMode.ReadOnly, image.PixelFormat);
 
             Dictionary<ColorCluster, bool> createdClusters = new Dictionary<ColorCluster, bool>();
-
-            HashSet<ColorCluster> invalidClusters = new HashSet<ColorCluster>();
 
             ColorCluster[] previousRowClusters = new ColorCluster[image.Width];
             ColorCluster[] currentRowClusters = new ColorCluster[image.Width];
@@ -199,7 +194,6 @@ namespace HeadTracker
                                 }
                             }
                             createdClusters[clusterBToRemove] = false;
-                            invalidClusters.Add(clusterBToRemove);
 
                             currentRowClusters[z] = currentRowClusters[z - 1];
                             goto end;
@@ -246,7 +240,7 @@ namespace HeadTracker
             }
             image.UnlockBits(originalBitmapData);
 
-            return (createdClusters.Where(x => x.Value).Select(x => x.Key).ToList(), invalidClusters);
+            return createdClusters.Where(x => x.Value).Select(x => x.Key).ToList();
         }
     }
 }

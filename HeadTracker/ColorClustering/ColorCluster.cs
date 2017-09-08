@@ -26,20 +26,7 @@ namespace HeadTracker
         }
 
         public void Init()
-        {
-            /*
-            Point center = new Point(0, 0);
-            foreach (ColorPoint cPoint in ColorPoints)
-            {
-                center.X += cPoint.x;
-                center.Y += cPoint.y;
-            }
-
-            center.X /= ClusterSize;
-            center.Y /= ClusterSize;
-
-            CenterPoint = center;
-            */    
+        {  
         }
 
         public void AddPixels(PixelStretch pixelStretch, int red, int green, int blue)
@@ -76,7 +63,7 @@ namespace HeadTracker
                                   ((int)(Blue / ClusterSize)));
         }
 
-        public ColorCluster GetBestMatchingSurroundingCluster(HashSet<ColorCluster> removedClusters)
+        public ColorCluster GetBestMatchingSurroundingCluster()
         {
             PixelColor colorToMatch = GetColorOfCluster();
 

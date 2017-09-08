@@ -110,10 +110,20 @@ namespace HeadTracker
                 videoSource.SignalToStop();
             }
         }
-        SemaphoreSlim ss = new SemaphoreSlim(4);
+
+        int number = 0;
 
         private void videoSource_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
         {
+            if (number < 5)
+            {
+                number++;
+                return;
+            }
+            else
+            {
+                number = 0;
+            }
             try
             {
                 //Cast the frame as Bitmap object and don't forget to use ".Clone()" otherwise
@@ -125,7 +135,7 @@ namespace HeadTracker
                 TempBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
 
                 ColorClusterCreator ct = new ColorClusterCreator(TempBitmap);
-
+                /*
                 List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
                 foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
                 {
@@ -147,6 +157,7 @@ namespace HeadTracker
                         }
                     }
                 }
+                */
 
                 Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(TempBitmap));
 
