@@ -15,7 +15,7 @@ namespace HeadTracker
 
         public ColorClusterCreator(Bitmap image)
         {
-            List<ColorCluster> createdClusters = CreateClusters(image);
+            List<ColorClusterInitData> createdClusters = CreateClusters(image);
             createdClusters = createdClusters.OrderByDescending(x => x.ClusterSize).ToList();
 
             //need to merge the smaller clusters into bigger clusters 
@@ -23,14 +23,14 @@ namespace HeadTracker
 
             for (int i = createdClusters.Count - 1; i >= 0; i--)
             {
-                ColorCluster cluster = createdClusters[i];
+                ColorClusterInitData cluster = createdClusters[i];
 
                 if (cluster.ClusterSize >= requiredPixels)
                 {
                     continue;
                 }
 
-                ColorCluster bestMatch = cluster.GetBestMatchingSurroundingCluster();
+                ColorClusterInitData bestMatch = cluster.GetBestMatchingSurroundingCluster();
                 if (bestMatch == null)
                 {
                     continue;
@@ -39,10 +39,10 @@ namespace HeadTracker
             }
 
             createdClusters.RemoveAll(x => x.ClusterSize < requiredPixels);
-            clusters = createdClusters;
+            clusters = createdClusters.Select(x => x.CreateColorCluster()).ToList();
         }
 
-        private List<ColorCluster> CreateClusters(Bitmap image)
+        private List<ColorClusterInitData> CreateClusters(Bitmap image)
         {
             PixelTypeInfo pixelInfo = PixelInfo.GetPixelTypeInfo(image);
             int pixelSize = pixelInfo.pixelSize;
@@ -51,10 +51,10 @@ namespace HeadTracker
 
             BitmapData originalBitmapData = image.LockBits(imageSize, ImageLockMode.ReadOnly, image.PixelFormat);
 
-            Dictionary<ColorCluster, bool> createdClusters = new Dictionary<ColorCluster, bool>();
+            Dictionary<ColorClusterInitData, bool> createdClusters = new Dictionary<ColorClusterInitData, bool>();
 
-            ColorCluster[] previousRowClusters = new ColorCluster[image.Width];
-            ColorCluster[] currentRowClusters = new ColorCluster[image.Width];
+            ColorClusterInitData[] previousRowClusters = new ColorClusterInitData[image.Width];
+            ColorClusterInitData[] currentRowClusters = new ColorClusterInitData[image.Width];
 
             PixelColor[] previousRowPixels = new PixelColor[image.Width];
             PixelColor[] currentRowPixels = new PixelColor[image.Width];
@@ -90,7 +90,7 @@ namespace HeadTracker
 
                             currentRowPixels[z] = currentPixelColor;
 
-                            const int MAX_PIXEL_DIFFERENCE = 3;
+                            const float MAX_PIXEL_DIFFERENCE = 1;
 
                             //This giant nested if is a clusterfuck but i currently don't
                             //know how to make it better.
@@ -163,7 +163,7 @@ namespace HeadTracker
                             break;
 
                             createCluster:
-                            ColorCluster newCluster = new ColorCluster();
+                            ColorClusterInitData newCluster = new ColorClusterInitData();
                             currentRowClusters[z] = newCluster;
                             createdClusters.Add(newCluster, true);
                             goto end;
@@ -178,7 +178,7 @@ namespace HeadTracker
 
                             combineClusters:
                             currentRowClusters[z - 1].AddCluster(previousRowClusters[z]);
-                            ColorCluster clusterBToRemove = previousRowClusters[z];
+                            ColorClusterInitData clusterBToRemove = previousRowClusters[z];
                             for (int q = 0; q < currentRowClusters.Length; q++)
                             {
                                 if (currentRowClusters[q] == clusterBToRemove)
@@ -229,7 +229,7 @@ namespace HeadTracker
                         }
                     }
 
-                    ColorCluster[] tempCluster = previousRowClusters;
+                    ColorClusterInitData[] tempCluster = previousRowClusters;
                     previousRowClusters = currentRowClusters;
                     currentRowClusters = tempCluster;
 
@@ -241,6 +241,26 @@ namespace HeadTracker
             image.UnlockBits(originalBitmapData);
 
             return createdClusters.Where(x => x.Value).Select(x => x.Key).ToList();
+        }
+
+        public List<ColorCluster> GetClustersSortedByMostRed()
+        {
+            return clusters.OrderByDescending(x => x.ClusterColor.red - (x.ClusterColor.green + x.ClusterColor.blue) / 2).ToList();
+        }
+        
+        public List<ColorCluster> GetClustersSortedByMostGreen()
+        {
+            return clusters.OrderByDescending(x => x.ClusterColor.green - (x.ClusterColor.red + x.ClusterColor.blue) / 2).ToList();
+        }
+
+        public List<ColorCluster> GetClustersSortedByMostBlue()
+        {
+            return clusters.OrderByDescending(x => x.ClusterColor.blue - (x.ClusterColor.green + x.ClusterColor.red) / 2).ToList();
+        }
+
+        public List<ColorCluster> GetClustersSortedByMostBlack()
+        {
+            return clusters.OrderBy(x => x.ClusterColor.red + x.ClusterColor.green + x.ClusterColor.blue).ToList();
         }
     }
 }

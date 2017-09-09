@@ -1,4 +1,5 @@
 ﻿using AForge.Video.DirectShow;
+using ImageInfo;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -50,22 +51,18 @@ namespace HeadTracker
             {
                 ct = new ColorClusterCreator(test);
             }
-
-            w.Stop();
             MessageBox.Show(w.ElapsedMilliseconds.ToString());
+            w.Stop();
             for (int i = 0; i < ct.clusters.Count; i++)
             {
                 ColorCluster cluster = ct.clusters[i];
                 System.Drawing.Color color = colors[i % colors.Count];
 
-                foreach (List<PixelStretch> listStretches in cluster.GetPixelStretches())
+                foreach (PixelStretch stretch in cluster.PixelStretches)
                 {
-                    foreach (PixelStretch stretch in listStretches)
+                    for (int x = stretch.startX; x <= stretch.endX; x++)
                     {
-                        for (int x = stretch.startX; x <= stretch.endX; x++)
-                        {
-                            test.SetPixel(x, stretch.y, color);
-                        }
+                        test.SetPixel(x, stretch.y, color);
                     }
                 }
             }
@@ -135,6 +132,32 @@ namespace HeadTracker
                 TempBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
 
                 ColorClusterCreator ct = new ColorClusterCreator(TempBitmap);
+                
+                List<ColorCluster> sortedByRed = ct.GetClustersSortedByMostRed();
+                System.Drawing.Point redPoint = sortedByRed.First().CenterPoint;
+
+                List<ColorCluster> sortedByGreen = ct.GetClustersSortedByMostGreen();
+                System.Drawing.Point greenPoint = sortedByGreen.First().CenterPoint;
+
+                List<ColorCluster> sortedByBlue = ct.GetClustersSortedByMostBlue();
+                System.Drawing.Point bluePoint = sortedByBlue.First().CenterPoint;
+
+                List<ColorCluster> sortedByBlack = ct.GetClustersSortedByMostBlack();
+                System.Drawing.Point blackPoint = sortedByBlack.First().CenterPoint;
+
+                using (Graphics g = Graphics.FromImage(TempBitmap))
+                {
+                    g.FillEllipse(System.Drawing.Brushes.Red, redPoint.X, redPoint.Y, 10, 10);
+                    g.FillEllipse(System.Drawing.Brushes.Green, greenPoint.X, greenPoint.Y, 10, 10);
+                    g.FillEllipse(System.Drawing.Brushes.Blue, bluePoint.X, bluePoint.Y, 10, 10);
+                    g.FillEllipse(System.Drawing.Brushes.Black, blackPoint.X, blackPoint.Y, 10, 10);
+                }
+
+                //DrawClusters(TempBitmap, sortedByRed, System.Drawing.Color.Red);
+                //DrawClusters(TempBitmap, sortedByGreen, System.Drawing.Color.Green);
+                //DrawClusters(TempBitmap, sortedByBlue, System.Drawing.Color.Blue);
+                //DrawClusters(TempBitmap, sortedByBlack, System.Drawing.Color.Black);
+                
                 /*
                 List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
                 foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
@@ -146,14 +169,11 @@ namespace HeadTracker
                     ColorCluster cluster = ct.clusters[i];
                     System.Drawing.Color color = colors[i % colors.Count];
 
-                    foreach (List<PixelStretch> listStretches in cluster.GetPixelStretches())
+                    foreach (PixelStretch stretch in cluster.PixelStretches)
                     {
-                        foreach (PixelStretch stretch in listStretches)
+                        for (int x = stretch.startX; x <= stretch.endX; x++)
                         {
-                            for (int x = stretch.startX; x <= stretch.endX; x++)
-                            {
-                                TempBitmap.SetPixel(x, stretch.y, color);
-                            }
+                            TempBitmap.SetPixel(x, stretch.y, color);
                         }
                     }
                 }
@@ -169,6 +189,20 @@ namespace HeadTracker
             catch (Exception e)
             {
                 throw;
+            }
+        }
+
+        private void DrawClusters(Bitmap image, List<ColorCluster> clusters, System.Drawing.Color color)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                foreach (PixelStretch stretch in clusters[i].PixelStretches)
+                {
+                    for (int x = stretch.startX; x <= stretch.endX; x++)
+                    {
+                        image.SetPixel(x, stretch.y, color);
+                    }
+                }
             }
         }
 
