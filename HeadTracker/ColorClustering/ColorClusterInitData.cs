@@ -32,11 +32,21 @@ namespace HeadTracker
 
             foreach (PixelStretch stretch in PixelStretches)
             {
-                totalX += (stretch.startX + stretch.endX) / 2;
-                totalY += stretch.y;
+                for (int i = stretch.startX; i <= stretch.endX; i++)
+                {
+                    totalX += i;
+                }
+
+                //calculate sum from start to end inclusive
+                //int sumToStart = (stretch.startX * (stretch.startX + 1)) / 2;
+                //int sumToEnd = (stretch.endX * (stretch.endX + 1)) / 2;
+                //totalX += (sumToEnd - sumToStart) + stretch.startX;
+
+                //totalX += (stretch.startX + stretch.endX) / 2;
+                totalY += stretch.y * ((stretch.endX - stretch.startX) + 1);
             }
 
-            Point centerPoint = new Point((int)(totalX / PixelStretches.Count), (int)(totalY / PixelStretches.Count));
+            Point centerPoint = new Point((int)(totalX / ClusterSize), (int)(totalY / ClusterSize));
 
             return new ColorCluster(PixelStretches, GetColorOfCluster(), ClusterSize, centerPoint);
         }
@@ -78,16 +88,16 @@ namespace HeadTracker
             cluster.partOf = this;
         }
 
-        public PixelColor GetColorOfCluster()
+        public RGBPixel GetColorOfCluster()
         {
-            return new PixelColor(((int)(Red / ClusterSize)),
+            return new RGBPixel(((int)(Red / ClusterSize)),
                                   ((int)(Green / ClusterSize)),
                                   ((int)(Blue / ClusterSize)));
         }
 
         public ColorClusterInitData GetBestMatchingSurroundingCluster()
         {
-            PixelColor colorToMatch = GetColorOfCluster();
+            RGBPixel colorToMatch = GetColorOfCluster();
 
             ColorClusterInitData bestCluster = null;
             float bestDistance = 10000;

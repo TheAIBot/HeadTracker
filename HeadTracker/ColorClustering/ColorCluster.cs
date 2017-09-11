@@ -11,11 +11,11 @@ namespace HeadTracker
     public class ColorCluster
     {
         public readonly List<PixelStretch> PixelStretches = new List<PixelStretch>();
-        public readonly PixelColor ClusterColor;
+        public readonly RGBPixel ClusterColor;
         public readonly int ClusterSize = 0;
         public readonly Point CenterPoint;
 
-        public ColorCluster(List<PixelStretch> stretches, PixelColor color, int size, Point center)
+        public ColorCluster(List<PixelStretch> stretches, RGBPixel color, int size, Point center)
         {
             this.PixelStretches = stretches;
             this.ClusterColor = color;

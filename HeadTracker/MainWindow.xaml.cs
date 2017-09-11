@@ -37,7 +37,7 @@ namespace HeadTracker
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            
+            /*
             List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
             foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
             {
@@ -47,12 +47,13 @@ namespace HeadTracker
             Stopwatch w = new Stopwatch();
             w.Start();
             ColorClusterCreator ct = null;
-            for (int i = 0; i < 5; i++)
-            {
+            //for (int i = 0; i < 5; i++)
+            //{
                 ct = new ColorClusterCreator(test);
-            }
-            MessageBox.Show(w.ElapsedMilliseconds.ToString());
+            //}
+
             w.Stop();
+            //MessageBox.Show(w.ElapsedMilliseconds.ToString());
             for (int i = 0; i < ct.clusters.Count; i++)
             {
                 ColorCluster cluster = ct.clusters[i];
@@ -67,9 +68,9 @@ namespace HeadTracker
                 }
             }
             
-            test.Save("testResult3.png");
+            test.Save("testResult4.png");
             MessageBox.Show(w.ElapsedMilliseconds.ToString());
-            
+            */
 
             FilterInfoCollection videoSources = new FilterInfoCollection(FilterCategory.VideoInputDevice);
 
@@ -145,19 +146,20 @@ namespace HeadTracker
                 List<ColorCluster> sortedByBlack = ct.GetClustersSortedByMostBlack();
                 System.Drawing.Point blackPoint = sortedByBlack.First().CenterPoint;
 
+                DrawClusters(TempBitmap, sortedByRed, System.Drawing.Color.Red);
+                DrawClusters(TempBitmap, sortedByGreen, System.Drawing.Color.Green);
+                DrawClusters(TempBitmap, sortedByBlue, System.Drawing.Color.Blue);
+                DrawClusters(TempBitmap, sortedByBlack, System.Drawing.Color.Black);
+                
                 using (Graphics g = Graphics.FromImage(TempBitmap))
                 {
-                    g.FillEllipse(System.Drawing.Brushes.Red, redPoint.X, redPoint.Y, 10, 10);
-                    g.FillEllipse(System.Drawing.Brushes.Green, greenPoint.X, greenPoint.Y, 10, 10);
-                    g.FillEllipse(System.Drawing.Brushes.Blue, bluePoint.X, bluePoint.Y, 10, 10);
+                    g.FillEllipse(System.Drawing.Brushes.DarkRed, redPoint.X, redPoint.Y, 10, 10);
+                    g.FillEllipse(System.Drawing.Brushes.DarkGreen, greenPoint.X, greenPoint.Y, 10, 10);
+                    g.FillEllipse(System.Drawing.Brushes.DarkBlue, bluePoint.X, bluePoint.Y, 10, 10);
                     g.FillEllipse(System.Drawing.Brushes.Black, blackPoint.X, blackPoint.Y, 10, 10);
                 }
-
-                //DrawClusters(TempBitmap, sortedByRed, System.Drawing.Color.Red);
-                //DrawClusters(TempBitmap, sortedByGreen, System.Drawing.Color.Green);
-                //DrawClusters(TempBitmap, sortedByBlue, System.Drawing.Color.Blue);
-                //DrawClusters(TempBitmap, sortedByBlack, System.Drawing.Color.Black);
                 
+
                 /*
                 List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
                 foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))

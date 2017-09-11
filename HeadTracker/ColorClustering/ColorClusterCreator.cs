@@ -56,8 +56,8 @@ namespace HeadTracker
             ColorClusterInitData[] previousRowClusters = new ColorClusterInitData[image.Width];
             ColorClusterInitData[] currentRowClusters = new ColorClusterInitData[image.Width];
 
-            PixelColor[] previousRowPixels = new PixelColor[image.Width];
-            PixelColor[] currentRowPixels = new PixelColor[image.Width];
+            LabPixel[] previousRowPixels = new LabPixel[image.Width];
+            LabPixel[] currentRowPixels = new LabPixel[image.Width];
 
             unsafe
             {
@@ -71,7 +71,7 @@ namespace HeadTracker
                     {
                         
                         byte* firstPixelStretchPtr = originalRowPtr + (x * pixelSize);
-                        PixelColor prevPixelColor = PixelInfo.GetPixelColorAsPixelColor(firstPixelStretchPtr, pixelInfo);
+                        LabPixel prevPixel = PixelInfo.GetPixelColorAsPixelColor(firstPixelStretchPtr, pixelInfo).ToLabPixel();
 
                         int stretchRed = 0;
                         int stretchGreen = 0;
@@ -82,19 +82,20 @@ namespace HeadTracker
                         for (int z = x; z < originalBitmapData.Width; z++)
                         {
                             byte* pixelPtr = originalRowPtr + (z * pixelSize);
-                            PixelColor currentPixelColor = PixelInfo.GetPixelColorAsPixelColor(pixelPtr, pixelInfo);
+                            RGBPixel currentRGBPixel = PixelInfo.GetPixelColorAsPixelColor(pixelPtr, pixelInfo);
+                            LabPixel currentLabPixel = currentRGBPixel.ToLabPixel();
 
-                            stretchRed += currentPixelColor.red;
-                            stretchGreen += currentPixelColor.green;
-                            stretchBlue += currentPixelColor.blue;
+                            stretchRed += currentRGBPixel.red;
+                            stretchGreen += currentRGBPixel.green;
+                            stretchBlue += currentRGBPixel.blue;
 
-                            currentRowPixels[z] = currentPixelColor;
+                            currentRowPixels[z] = currentLabPixel;
 
-                            const float MAX_PIXEL_DIFFERENCE = 1;
+                            const double MAX_PIXEL_DIFFERENCE = 1.1;
 
                             //This giant nested if is a clusterfuck but i currently don't
                             //know how to make it better.
-                            if (currentPixelColor.Distance(prevPixelColor) < MAX_PIXEL_DIFFERENCE)
+                            if (currentLabPixel.DistanceCIE94(prevPixel) < MAX_PIXEL_DIFFERENCE)
                             {
                                 //if this is the first pixel in this cluster.
                                 if (x == z)
@@ -105,7 +106,7 @@ namespace HeadTracker
                                     }
                                     else
                                     {
-                                        if (previousRowPixels[z].Distance(currentPixelColor) < MAX_PIXEL_DIFFERENCE)
+                                        if (previousRowPixels[z].DistanceCIE94(currentLabPixel) < MAX_PIXEL_DIFFERENCE)
                                         {
                                             goto usePreviousAboveCluster;
                                         }
@@ -123,7 +124,7 @@ namespace HeadTracker
                                     }
                                     else
                                     {
-                                        if (previousRowPixels[z].Distance(currentPixelColor) < MAX_PIXEL_DIFFERENCE)
+                                        if (previousRowPixels[z].DistanceCIE94(currentLabPixel) < MAX_PIXEL_DIFFERENCE)
                                         {
                                             if (previousRowClusters[z] == currentRowClusters[z - 1])
                                             {
@@ -148,9 +149,9 @@ namespace HeadTracker
 
                             endStretch:
                             //this pixel isn't part of the stretch so remove its color value
-                            stretchRed -= currentPixelColor.red;
-                            stretchGreen -= currentPixelColor.green;
-                            stretchBlue -= currentPixelColor.blue;
+                            stretchRed -= currentRGBPixel.red;
+                            stretchGreen -= currentRGBPixel.green;
+                            stretchBlue -= currentRGBPixel.blue;
 
                             //z - 1 because this pixel isn't part of this cluster.
                             PixelStretch stretch = new PixelStretch(x, z - 1, y);
@@ -218,7 +219,7 @@ namespace HeadTracker
                                 previousRowClusters[z].AddSurroundingCluster(currentRowClusters[z]);
                             }
 
-                            prevPixelColor = currentPixelColor;
+                            prevPixel = currentLabPixel;
                         }
 
                         if (!isStretchClosed)
@@ -233,7 +234,7 @@ namespace HeadTracker
                     previousRowClusters = currentRowClusters;
                     currentRowClusters = tempCluster;
 
-                    PixelColor[] tempPixel = previousRowPixels;
+                    LabPixel[] tempPixel = previousRowPixels;
                     previousRowPixels = currentRowPixels;
                     currentRowPixels = tempPixel;
                 }
