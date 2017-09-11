@@ -219,7 +219,9 @@ namespace HeadTracker
                                 previousRowClusters[z].AddSurroundingCluster(currentRowClusters[z]);
                             }
 
-                            prevPixel = currentLabPixel;
+                            int numberOfPixelsInStretch = (z - x) + 1;
+                            RGBPixel prevPixelRGB = new RGBPixel(stretchRed / numberOfPixelsInStretch, stretchGreen / numberOfPixelsInStretch, stretchBlue / numberOfPixelsInStretch);
+                            prevPixel = prevPixelRGB.ToLabPixel();
                         }
 
                         if (!isStretchClosed)
