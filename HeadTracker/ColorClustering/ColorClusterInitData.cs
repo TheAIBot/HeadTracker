@@ -97,10 +97,10 @@ namespace HeadTracker
 
         public ColorClusterInitData GetBestMatchingSurroundingCluster()
         {
-            RGBPixel colorToMatch = GetColorOfCluster();
+            LabPixel colorToMatch = GetColorOfCluster().ToLabPixel();
 
             ColorClusterInitData bestCluster = null;
-            float bestDistance = 10000;
+            double bestDistance = 10000;
 
             foreach (ColorClusterInitData subCluster in GetSurroundingClusters())
             {
@@ -111,7 +111,7 @@ namespace HeadTracker
                     continue;
                 }
 
-                float distance = colorToMatch.Distance(cluster.GetColorOfCluster());
+                double distance = colorToMatch.DistanceCIE94IgnoreIllumination(cluster.GetColorOfCluster().ToLabPixel());
                 if (distance < bestDistance || bestCluster == null)
                 {
                     bestCluster = cluster;

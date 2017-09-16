@@ -91,11 +91,11 @@ namespace HeadTracker
 
                             currentRowPixels[z] = currentLabPixel;
 
-                            const double MAX_PIXEL_DIFFERENCE = 1.1;
+                            const double MAX_PIXEL_DIFFERENCE = 1;
 
                             //This giant nested if is a clusterfuck but i currently don't
                             //know how to make it better.
-                            if (currentLabPixel.DistanceCIE94(prevPixel) < MAX_PIXEL_DIFFERENCE)
+                            if (currentLabPixel.DistanceCIE94IgnoreIllumination(prevPixel) < MAX_PIXEL_DIFFERENCE)
                             {
                                 //if this is the first pixel in this cluster.
                                 if (x == z)
@@ -106,7 +106,7 @@ namespace HeadTracker
                                     }
                                     else
                                     {
-                                        if (previousRowPixels[z].DistanceCIE94(currentLabPixel) < MAX_PIXEL_DIFFERENCE)
+                                        if (previousRowPixels[z].DistanceCIE94IgnoreIllumination(currentLabPixel) < MAX_PIXEL_DIFFERENCE)
                                         {
                                             goto usePreviousAboveCluster;
                                         }
@@ -124,7 +124,7 @@ namespace HeadTracker
                                     }
                                     else
                                     {
-                                        if (previousRowPixels[z].DistanceCIE94(currentLabPixel) < MAX_PIXEL_DIFFERENCE)
+                                        if (previousRowPixels[z].DistanceCIE94IgnoreIllumination(currentLabPixel) < MAX_PIXEL_DIFFERENCE)
                                         {
                                             if (previousRowClusters[z] == currentRowClusters[z - 1])
                                             {
@@ -248,7 +248,8 @@ namespace HeadTracker
 
         public List<ColorCluster> GetClustersSortedByMostRed()
         {
-            return clusters.OrderByDescending(x => x.ClusterColor.red - (x.ClusterColor.green + x.ClusterColor.blue) / 2).ToList();
+            LabPixel redPixel = new RGBPixel(255, 0, 0).ToLabPixel();
+            return clusters.OrderBy(x => redPixel.DistanceCIE94IgnoreIllumination(x.ClusterColor.ToLabPixel())).ToList();
         }
         
         public List<ColorCluster> GetClustersSortedByMostGreen()

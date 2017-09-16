@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -37,6 +38,18 @@ namespace HeadTracker
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            Bitmap test = new Bitmap("test3.png");
+            for (int y = 0; y < test.Height; y++)
+            {
+                for (int x = 0; x < test.Width; x++)
+                {
+                    System.Drawing.Color a = test.GetPixel(x, y);
+                    LabPixel b = new RGBPixel(a.R, a.G, a.B).ToLabPixel();
+                    test.SetPixel(x, y, System.Drawing.Color.FromArgb(50, b.a + 128, b.b + 128));
+                }
+            }
+            test.Save("lab2.png", ImageFormat.Png);
+
             /*
             List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
             foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
@@ -145,7 +158,7 @@ namespace HeadTracker
 
                 List<ColorCluster> sortedByBlack = ct.GetClustersSortedByMostBlack();
                 System.Drawing.Point blackPoint = sortedByBlack.First().CenterPoint;
-
+                
                 DrawClusters(TempBitmap, sortedByRed, System.Drawing.Color.Red);
                 DrawClusters(TempBitmap, sortedByGreen, System.Drawing.Color.Green);
                 DrawClusters(TempBitmap, sortedByBlue, System.Drawing.Color.Blue);
