@@ -12,52 +12,22 @@ namespace HeadTracker
     class ColorClusterCreator
     {
         public readonly List<ColorCluster> clusters;
+        public readonly Bitmap clusterBitmap;
 
         public ColorClusterCreator(Bitmap image)
         {
-            List<ColorClusterInitData> createdClusters = CreateClusters(image);
-            createdClusters = createdClusters.OrderByDescending(x => x.ClusterSize).ToList();
-
-            //need to merge the smaller clusters into bigger clusters 
-            const int requiredPixels = 400;
-
-            for (int i = createdClusters.Count - 1; i >= 0; i--)
-            {
-                ColorClusterInitData cluster = createdClusters[i];
-
-                if (cluster.ClusterSize >= requiredPixels)
-                {
-                    continue;
-                }
-
-                ColorClusterInitData bestMatch = cluster.GetBestMatchingSurroundingCluster();
-                if (bestMatch == null)
-                {
-                    continue;
-                }
-                bestMatch.AddCluster(cluster);
-            }
-
-            createdClusters.RemoveAll(x => x.ClusterSize < requiredPixels);
-            clusters = createdClusters.Select(x => x.CreateColorCluster()).ToList();
+            LabPixel[] labPixels = ToLabPixels(image);
+            int[] clusterMap = CreateClusterMap(labPixels, image.Width, image.Height);
+            clusterBitmap = BitmapFromClusterMap(clusterMap, image.Width, image.Height);
         }
 
-        private List<ColorClusterInitData> CreateClusters(Bitmap image)
+        private LabPixel[] ToLabPixels(Bitmap image)
         {
             PixelTypeInfo pixelInfo = PixelInfo.GetPixelTypeInfo(image);
-            int pixelSize = pixelInfo.pixelSize;
-            int rgbSize = pixelInfo.rgbSize;
             Rectangle imageSize = new Rectangle(0, 0, image.Width, image.Height);
-
             BitmapData originalBitmapData = image.LockBits(imageSize, ImageLockMode.ReadOnly, image.PixelFormat);
 
-            Dictionary<ColorClusterInitData, bool> createdClusters = new Dictionary<ColorClusterInitData, bool>();
-
-            ColorClusterInitData[] previousRowClusters = new ColorClusterInitData[image.Width];
-            ColorClusterInitData[] currentRowClusters = new ColorClusterInitData[image.Width];
-
-            LabPixel[] previousRowPixels = new LabPixel[image.Width];
-            LabPixel[] currentRowPixels = new LabPixel[image.Width];
+            LabPixel[] labPixels = new LabPixel[image.Width * image.Height];
 
             unsafe
             {
@@ -67,183 +37,198 @@ namespace HeadTracker
                 {
                     byte* originalRowPtr = originalPtr + (y * originalBitmapData.Stride);
 
-                    for (int x = 0; x < originalBitmapData.Width; /*do nothing here as it's handled elsewhere*/)
+                    for (int x = 0; x < originalBitmapData.Width; x++)
                     {
-                        
-                        byte* firstPixelStretchPtr = originalRowPtr + (x * pixelSize);
-                        LabPixel prevPixel = PixelInfo.GetPixelColorAsPixelColor(firstPixelStretchPtr, pixelInfo).ToLabPixel();
-
-                        int stretchRed = 0;
-                        int stretchGreen = 0;
-                        int stretchBlue = 0;
-
-                        Boolean isStretchClosed = false;
-
-                        for (int z = x; z < originalBitmapData.Width; z++)
-                        {
-                            byte* pixelPtr = originalRowPtr + (z * pixelSize);
-                            RGBPixel currentRGBPixel = PixelInfo.GetPixelColorAsPixelColor(pixelPtr, pixelInfo);
-                            LabPixel currentLabPixel = currentRGBPixel.ToLabPixel();
-
-                            stretchRed += currentRGBPixel.red;
-                            stretchGreen += currentRGBPixel.green;
-                            stretchBlue += currentRGBPixel.blue;
-
-                            currentRowPixels[z] = currentLabPixel;
-
-                            const double MAX_PIXEL_DIFFERENCE = 1;
-
-                            //This giant nested if is a clusterfuck but i currently don't
-                            //know how to make it better.
-                            if (currentLabPixel.DistanceCIE94IgnoreIllumination(prevPixel) < MAX_PIXEL_DIFFERENCE)
-                            {
-                                //if this is the first pixel in this cluster.
-                                if (x == z)
-                                {
-                                    if (previousRowClusters[z] == null)
-                                    {
-                                        goto createCluster;
-                                    }
-                                    else
-                                    {
-                                        if (previousRowPixels[z].DistanceCIE94IgnoreIllumination(currentLabPixel) < MAX_PIXEL_DIFFERENCE)
-                                        {
-                                            goto usePreviousAboveCluster;
-                                        }
-                                        else
-                                        {
-                                            goto createCluster;
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    if (previousRowClusters[z] == null)
-                                    {
-                                        goto usePreviousPixelCluster;
-                                    }
-                                    else
-                                    {
-                                        if (previousRowPixels[z].DistanceCIE94IgnoreIllumination(currentLabPixel) < MAX_PIXEL_DIFFERENCE)
-                                        {
-                                            if (previousRowClusters[z] == currentRowClusters[z - 1])
-                                            {
-                                                goto usePreviousAboveCluster;
-                                            }
-                                            else
-                                            {
-                                                goto combineClusters;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            goto usePreviousPixelCluster;
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                goto endStretch;
-                            }
-
-                            endStretch:
-                            //this pixel isn't part of the stretch so remove its color value
-                            stretchRed -= currentRGBPixel.red;
-                            stretchGreen -= currentRGBPixel.green;
-                            stretchBlue -= currentRGBPixel.blue;
-
-                            //z - 1 because this pixel isn't part of this cluster.
-                            PixelStretch stretch = new PixelStretch(x, z - 1, y);
-                            currentRowClusters[z - 1].AddPixels(stretch, stretchRed, stretchGreen, stretchBlue);
-                            isStretchClosed = true;
-
-                            //set x to this pixels position and break, so a new pixel stretch can
-                            //be created with this pixel as the starting pixel.
-                            x += (z - x);
-                            break;
-
-                            createCluster:
-                            ColorClusterInitData newCluster = new ColorClusterInitData();
-                            currentRowClusters[z] = newCluster;
-                            createdClusters.Add(newCluster, true);
-                            goto end;
-
-                            usePreviousAboveCluster:
-                            currentRowClusters[z] = previousRowClusters[z];
-                            goto end;
-
-                            usePreviousPixelCluster:
-                            currentRowClusters[z] = currentRowClusters[z - 1];
-                            goto end;
-
-                            combineClusters:
-                            currentRowClusters[z - 1].AddCluster(previousRowClusters[z]);
-                            ColorClusterInitData clusterBToRemove = previousRowClusters[z];
-                            for (int q = 0; q < currentRowClusters.Length; q++)
-                            {
-                                if (currentRowClusters[q] == clusterBToRemove)
-                                {
-                                    currentRowClusters[q] = currentRowClusters[z - 1];
-                                }
-                            }
-                            for (int q = 0; q < previousRowClusters.Length; q++)
-                            {
-                                if (previousRowClusters[q] == clusterBToRemove)
-                                {
-                                    previousRowClusters[q] = currentRowClusters[z - 1];
-                                }
-                            }
-                            createdClusters[clusterBToRemove] = false;
-
-                            currentRowClusters[z] = currentRowClusters[z - 1];
-                            goto end;
-
-                            end:
-                            //now add surrounding clusters to the current cluster and those surrounding it
-
-                            //if first pixel in stretch and there is a pixel to the left
-                            if (z == x && z > 0)
-                            {
-                                //add left cluster to right surrounding clusters
-                                currentRowClusters[z].AddSurroundingCluster(currentRowClusters[z - 1]);
-                                //add right cluster to left surrounding clusters
-                                currentRowClusters[z - 1].AddSurroundingCluster(currentRowClusters[z]);
-                            }
-                            //if there is a pixel above
-                            if (y > 0)
-                            {
-                                //add top cluster to bottom surrounding clusters
-                                currentRowClusters[z].AddSurroundingCluster(previousRowClusters[z]);
-                                //add bottom cluster to top surrounding clusters
-                                previousRowClusters[z].AddSurroundingCluster(currentRowClusters[z]);
-                            }
-
-                            int numberOfPixelsInStretch = (z - x) + 1;
-                            RGBPixel prevPixelRGB = new RGBPixel(stretchRed / numberOfPixelsInStretch, stretchGreen / numberOfPixelsInStretch, stretchBlue / numberOfPixelsInStretch);
-                            prevPixel = prevPixelRGB.ToLabPixel();
-                        }
-
-                        if (!isStretchClosed)
-                        {
-                            PixelStretch stretch = new PixelStretch(x, originalBitmapData.Width - 1, y);
-                            currentRowClusters[originalBitmapData.Width - 1].AddPixels(stretch, stretchRed, stretchGreen, stretchBlue);
-                            break;
-                        }
+                        byte* pixelPtr = originalRowPtr + (x * pixelInfo.pixelSize);
+                        LabPixel labPixel = PixelInfo.GetPixelColorAsPixelColor(pixelPtr, pixelInfo).ToLabPixel();
+                        labPixels[y * image.Width + x] = labPixel;
                     }
-
-                    ColorClusterInitData[] tempCluster = previousRowClusters;
-                    previousRowClusters = currentRowClusters;
-                    currentRowClusters = tempCluster;
-
-                    LabPixel[] tempPixel = previousRowPixels;
-                    previousRowPixels = currentRowPixels;
-                    currentRowPixels = tempPixel;
                 }
             }
             image.UnlockBits(originalBitmapData);
 
-            return createdClusters.Where(x => x.Value).Select(x => x.Key).ToList();
+            return labPixels;
+        }
+
+        private int[] CreateClusterMap(LabPixel[] labPixels, int width, int height)
+        {
+            List<int> clusterIndexes = new List<int>();
+            int[] clusterMap = new int[width * height];
+            int clusterCount = 0;
+            const double maxColorDifference = 1.7;
+
+            //The top left most pixel is part of cluster 0
+            //as 0 is the default value of an int it's not nessesary
+            //to set the pixels cluster in the clustermap. instead
+            //just add the cluster.
+            clusterIndexes.Add(0);
+            clusterCount++;
+
+            for (int x = 1; x < width; x++)
+            {
+                int currentPixelIndex = x;
+                int leftPixelIndex = x - 1;
+
+                LabPixel currentPixel = labPixels[currentPixelIndex];
+                LabPixel leftPixel = labPixels[leftPixelIndex];
+
+                if (currentPixel.DistanceCIE94(leftPixel) < maxColorDifference)
+                {
+                    clusterMap[currentPixelIndex] = clusterMap[leftPixelIndex];
+                }
+                else
+                {
+                    clusterIndexes.Add(clusterCount);
+                    clusterMap[currentPixelIndex] = clusterCount;
+                    clusterCount++;
+                }
+            }
+
+            for (int y = 1; y < height; y++)
+            {
+                int currentPixelIndex = y * width;
+                int topPixelIndex = (y - 1) * width;
+
+                LabPixel currentPixel = labPixels[currentPixelIndex];
+                LabPixel topPixel = labPixels[topPixelIndex];
+
+                if (currentPixel.DistanceCIE94(topPixel) < maxColorDifference)
+                {
+                    clusterMap[currentPixelIndex] = clusterMap[topPixelIndex];
+                }
+                else
+                {
+                    clusterIndexes.Add(clusterCount);
+                    clusterMap[currentPixelIndex] = clusterCount;
+                    clusterCount++;
+                }
+            }
+
+            //Now in the next step it's possible to merge clusters
+            //That is done by making the clusterIndex point at the index of the 
+            //cluster it was merged into. But this 
+            //const uint signBit = 0x80000000;
+
+            for (int y = 1; y < height; y++)
+            {
+                for (int x = 1; x < width; x++)
+                {
+                    int currentPixelIndex = y * width + x;
+                    int topPixelIndex = currentPixelIndex - width;
+                    int leftPixelIndex = currentPixelIndex - 1;
+
+                    LabPixel currentPixel = labPixels[currentPixelIndex];
+                    LabPixel topPixel = labPixels[topPixelIndex];
+                    LabPixel leftPixel = labPixels[leftPixelIndex];
+
+                    int isSimilarToTopPixel = (currentPixel.DistanceCIE94(topPixel) < maxColorDifference) ? 1 : 0;
+                    int isSimilarToLeftPixel = (currentPixel.DistanceCIE94(leftPixel) < maxColorDifference) ? 2 : 0;
+                    int matchingPixels = isSimilarToTopPixel + isSimilarToLeftPixel;
+
+                    switch (matchingPixels)
+                    {
+                        //No pixel match.
+                        //Create new cluster.
+                        case 0:
+                            clusterIndexes.Add(clusterCount);
+                            clusterMap[currentPixelIndex] = clusterCount;
+                            clusterCount++;
+                            break;
+                        //Only top pixel match.
+                        //Use cluster from top pixel.
+                        case 1:
+                            clusterMap[currentPixelIndex] = clusterMap[topPixelIndex];
+                            break;
+                        //Only left pixel match.
+                        //Use cluster from left pixel.
+                        case 2:
+                            clusterMap[currentPixelIndex] = clusterMap[leftPixelIndex];
+                            break;
+                        //Both pixels match.
+                        //Merge top cluster into left cluster and then use left cluster.
+                        case 3:
+                            int minClusterIndex = Math.Min(clusterMap[topPixelIndex], clusterMap[leftPixelIndex]);
+                            clusterIndexes[clusterMap[topPixelIndex]] = minClusterIndex;
+                            clusterIndexes[clusterMap[leftPixelIndex]] = minClusterIndex;
+                            clusterMap[currentPixelIndex] = minClusterIndex;
+                            //clusterIndexes[clusterMap[leftPixelIndex]] = clusterMap[topPixelIndex];
+                            //clusterMap[currentPixelIndex] = clusterMap[topPixelIndex];
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+
+            int uniqueClustersCount = 0;
+            for (int i = 0; i < clusterIndexes.Count; i++)
+            {
+                if (i == clusterIndexes[i])
+                {
+                    uniqueClustersCount++;
+                }
+            }
+
+            for (int i = 0; i < clusterIndexes.Count; i++)
+            {
+                int index = i;
+                int clusterIndex = clusterIndexes[index];
+                //Only superclusters won't have the sign bit set
+                while (clusterIndex != index)
+                {
+                    index = clusterIndex;
+                    clusterIndex = clusterIndexes[index];
+                }
+
+                clusterIndexes[i] = clusterIndex;
+            }
+
+            //Now go through all clusters and replace merged clusters with the merged cluster number
+            for (int i = 0; i < clusterMap.Length; i++)
+            {
+                clusterMap[i] = clusterIndexes[clusterMap[i]];
+            }
+
+            return clusterMap;
+        }
+
+        public Bitmap BitmapFromClusterMap(int[] clusterMap, int width, int height)
+        {
+            Bitmap withClusters = new Bitmap(width, height, PixelFormat.Format24bppRgb);
+
+            List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
+            foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
+            {
+                colors.Add(System.Drawing.Color.FromKnownColor((KnownColor)colorValue));
+            }
+
+            PixelTypeInfo pixelInfo = PixelInfo.GetPixelTypeInfo(withClusters);
+            Rectangle imageSize = new Rectangle(0, 0, withClusters.Width, withClusters.Height);
+            BitmapData originalBitmapData = withClusters.LockBits(imageSize, ImageLockMode.WriteOnly, withClusters.PixelFormat);
+
+            unsafe
+            {
+                byte* originalPtr = (byte*)originalBitmapData.Scan0;
+
+                for (int y = 0; y < originalBitmapData.Height; y++)
+                {
+                    byte* originalRowPtr = originalPtr + (y * originalBitmapData.Stride);
+
+                    for (int x = 0; x < originalBitmapData.Width; x++)
+                    {
+                        byte* pixelPtr = originalRowPtr + (x * pixelInfo.pixelSize);
+                        int clusterNumber = clusterMap[y * width + x];
+
+                        System.Drawing.Color color = colors[clusterNumber % colors.Count];
+                        pixelPtr[0] = color.R;
+                        pixelPtr[1] = color.G;
+                        pixelPtr[2] = color.B;
+                    }
+                }
+            }
+            withClusters.UnlockBits(originalBitmapData);
+
+            return withClusters;
         }
 
         public List<ColorCluster> GetClustersSortedByMostRed()

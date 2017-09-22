@@ -37,53 +37,27 @@ namespace HeadTracker
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-            Bitmap test = new Bitmap("test3.png");
-            for (int y = 0; y < test.Height; y++)
-            {
-                for (int x = 0; x < test.Width; x++)
-                {
-                    System.Drawing.Color a = test.GetPixel(x, y);
-                    LabPixel b = new RGBPixel(a.R, a.G, a.B).ToLabPixel();
-                    test.SetPixel(x, y, System.Drawing.Color.FromArgb(50, b.a + 128, b.b + 128));
-                }
-            }
-            test.Save("lab2.png", ImageFormat.Png);
-
-            /*
+        {            
+            
             List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
             foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
             {
                 colors.Add(System.Drawing.Color.FromKnownColor((KnownColor)colorValue));
             }
-            Bitmap test = new Bitmap("test3.png");
+            Bitmap test = new Bitmap("test2.png");
             Stopwatch w = new Stopwatch();
             w.Start();
             ColorClusterCreator ct = null;
-            //for (int i = 0; i < 5; i++)
-            //{
+            for (int i = 0; i < 5; i++)
+            {
                 ct = new ColorClusterCreator(test);
-            //}
+            }
 
             w.Stop();
-            //MessageBox.Show(w.ElapsedMilliseconds.ToString());
-            for (int i = 0; i < ct.clusters.Count; i++)
-            {
-                ColorCluster cluster = ct.clusters[i];
-                System.Drawing.Color color = colors[i % colors.Count];
-
-                foreach (PixelStretch stretch in cluster.PixelStretches)
-                {
-                    for (int x = stretch.startX; x <= stretch.endX; x++)
-                    {
-                        test.SetPixel(x, stretch.y, color);
-                    }
-                }
-            }
             
-            test.Save("testResult4.png");
+            ct.clusterBitmap.Save("testResult.png");
             MessageBox.Show(w.ElapsedMilliseconds.ToString());
-            */
+            
 
             FilterInfoCollection videoSources = new FilterInfoCollection(FilterCategory.VideoInputDevice);
 
@@ -142,11 +116,11 @@ namespace HeadTracker
                 //you'll probably get access violation exceptions
                 watch.Reset();
                 watch.Start();
-
+                
                 TempBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
 
                 ColorClusterCreator ct = new ColorClusterCreator(TempBitmap);
-                
+                /*
                 List<ColorCluster> sortedByRed = ct.GetClustersSortedByMostRed();
                 System.Drawing.Point redPoint = sortedByRed.First().CenterPoint;
 
@@ -171,7 +145,7 @@ namespace HeadTracker
                     g.FillEllipse(System.Drawing.Brushes.DarkBlue, bluePoint.X, bluePoint.Y, 10, 10);
                     g.FillEllipse(System.Drawing.Brushes.Black, blackPoint.X, blackPoint.Y, 10, 10);
                 }
-                
+                */
 
                 /*
                 List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
@@ -194,7 +168,7 @@ namespace HeadTracker
                 }
                 */
 
-                Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(TempBitmap));
+                Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(ct.clusterBitmap));
 
                 watch.Stop();
                 string fisk = (watch.ElapsedMilliseconds == 0) ? "30" : (1000 / watch.ElapsedMilliseconds).ToString();
