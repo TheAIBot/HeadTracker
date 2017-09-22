@@ -44,18 +44,20 @@ namespace HeadTracker
             {
                 colors.Add(System.Drawing.Color.FromKnownColor((KnownColor)colorValue));
             }
+
             Bitmap test = new Bitmap("test2.png");
+            ColorClusterCreator ct = new ColorClusterCreator(test.Width, test.Height);
+
             Stopwatch w = new Stopwatch();
             w.Start();
-            ColorClusterCreator ct = null;
-            for (int i = 0; i < 5; i++)
+            
+            for (int i = 0; i < 10; i++)
             {
-                ct = new ColorClusterCreator(test);
+                ct.UpdateClusters(test);
             }
 
             w.Stop();
-            
-            ct.clusterBitmap.Save("testResult.png");
+            ct.BitmapFromClusterMap().Save("testResult.png");
             MessageBox.Show(w.ElapsedMilliseconds.ToString());
             
 
@@ -119,7 +121,8 @@ namespace HeadTracker
                 
                 TempBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
 
-                ColorClusterCreator ct = new ColorClusterCreator(TempBitmap);
+                ColorClusterCreator ct = new ColorClusterCreator(TempBitmap.Width, TempBitmap.Height);
+                ct.UpdateClusters(TempBitmap);
                 /*
                 List<ColorCluster> sortedByRed = ct.GetClustersSortedByMostRed();
                 System.Drawing.Point redPoint = sortedByRed.First().CenterPoint;
@@ -168,7 +171,7 @@ namespace HeadTracker
                 }
                 */
 
-                Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(ct.clusterBitmap));
+                Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(ct.BitmapFromClusterMap()));
 
                 watch.Stop();
                 string fisk = (watch.ElapsedMilliseconds == 0) ? "30" : (1000 / watch.ElapsedMilliseconds).ToString();
