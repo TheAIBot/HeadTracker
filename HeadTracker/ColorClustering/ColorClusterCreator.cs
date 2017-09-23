@@ -6,24 +6,33 @@ using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using OpenCL;
 
 namespace HeadTracker
 {
     class ColorClusterCreator
     {
         public readonly List<ColorCluster> clusters;
+        public double MaxColorDistanceForMatch = 1.5;
 
         private readonly int ImageWidth;
         private readonly int ImageHeight;
+        private readonly int[] RGBPixels;
         private readonly LabPixel[] LabPixels;
         private readonly int[] ClusterMap;
+        private readonly EasyCL gpuAccel;
 
         public ColorClusterCreator(int width, int height)
         {
             this.ImageWidth = width;
             this.ImageHeight = height;
+            this.RGBPixels = new int[ImageWidth * ImageHeight * 3];
             this.LabPixels = new LabPixel[ImageWidth * ImageHeight];
             this.ClusterMap = new int[ImageWidth * ImageHeight];
+
+            this.gpuAccel = new EasyCL();
+            this.gpuAccel.Accelerator = AcceleratorDevice.GPU;
+            this.gpuAccel.LoadKernel(OpenClKernels.Kernel);
         }
 
         public void UpdateClusters(Bitmap image)
@@ -56,19 +65,32 @@ namespace HeadTracker
                     for (int x = 0; x < originalBitmapData.Width; x++)
                     {
                         byte* pixelPtr = originalRowPtr + (x * pixelInfo.pixelSize);
-                        LabPixel labPixel = PixelInfo.GetPixelColorAsPixelColor(pixelPtr, pixelInfo).ToLabPixel();
-                        LabPixels[y * image.Width + x] = labPixel;
+                        RGBPixel pixel = PixelInfo.GetPixelColorAsPixelColor(pixelPtr, pixelInfo);
+
+                        RGBPixels[y * ImageWidth * 3 + x * 3 + 0] = pixel.red;
+                        RGBPixels[y * ImageWidth * 3 + x * 3 + 1] = pixel.green;
+                        RGBPixels[y * ImageWidth * 3 + x * 3 + 2] = pixel.blue;
                     }
                 }
             }
             image.UnlockBits(originalBitmapData);
+
+            float[] LPixels = new float[RGBPixels.Length];
+            gpuAccel.Invoke("RGBToLab", 0, LabPixels.Length, RGBPixels, LPixels, 255f);
+            for (int i = 0; i < LabPixels.Length; i++)
+            {
+                int L = (int)LPixels[i * 3 + 0];
+                int a = (int)LPixels[i * 3 + 1];
+                int b = (int)LPixels[i * 3 + 2];
+
+                LabPixels[i] = new LabPixel(L, a, b);
+            }
         }
 
         private void CreateClusterMap()
         {
             List<int> clusterIndexes = new List<int>();
             int clusterCount = 0;
-            const double maxColorDifference = 1.7;
 
             //The top left most pixel is part of cluster 0
             //as 0 is the default value of an int it's not nessesary
@@ -77,6 +99,23 @@ namespace HeadTracker
             clusterIndexes.Add(0);
             clusterCount++;
 
+            InitClusterMapClusters(clusterIndexes, ref clusterCount);
+            FinishClusterMap(clusterIndexes, ref clusterCount);
+
+            RemoveSmallClusters();
+            MergeSimilarClusters();
+
+            FlattenClusterIndexes(clusterIndexes);
+
+            //Now go through all clusters and replace merged clusters with the merged cluster number
+            for (int i = 0; i < ClusterMap.Length; i++)
+            {
+                ClusterMap[i] = clusterIndexes[ClusterMap[i]];
+            }
+        }
+
+        private void InitClusterMapClusters(List<int> clusterIndexes, ref int clusterCount)
+        {
             for (int x = 1; x < ImageWidth; x++)
             {
                 int currentPixelIndex = x;
@@ -85,7 +124,7 @@ namespace HeadTracker
                 LabPixel currentPixel = LabPixels[currentPixelIndex];
                 LabPixel leftPixel = LabPixels[leftPixelIndex];
 
-                if (currentPixel.DistanceCIE94(leftPixel) < maxColorDifference)
+                if (currentPixel.DistanceCIE94(leftPixel) < MaxColorDistanceForMatch)
                 {
                     ClusterMap[currentPixelIndex] = ClusterMap[leftPixelIndex];
                 }
@@ -105,7 +144,7 @@ namespace HeadTracker
                 LabPixel currentPixel = LabPixels[currentPixelIndex];
                 LabPixel topPixel = LabPixels[topPixelIndex];
 
-                if (currentPixel.DistanceCIE94(topPixel) < maxColorDifference)
+                if (currentPixel.DistanceCIE94(topPixel) < MaxColorDistanceForMatch)
                 {
                     ClusterMap[currentPixelIndex] = ClusterMap[topPixelIndex];
                 }
@@ -117,11 +156,10 @@ namespace HeadTracker
                 }
             }
 
-            //Now in the next step it's possible to merge clusters
-            //That is done by making the clusterIndex point at the index of the 
-            //cluster it was merged into. But this 
-            //const uint signBit = 0x80000000;
+        }
 
+        private void FinishClusterMap(List<int> clusterIndexes, ref int clusterCount)
+        {
             for (int y = 1; y < ImageHeight; y++)
             {
                 for (int x = 1; x < ImageWidth; x++)
@@ -134,8 +172,8 @@ namespace HeadTracker
                     LabPixel topPixel = LabPixels[topPixelIndex];
                     LabPixel leftPixel = LabPixels[leftPixelIndex];
 
-                    int isSimilarToTopPixel = (currentPixel.DistanceCIE94(topPixel) < maxColorDifference) ? 1 : 0;
-                    int isSimilarToLeftPixel = (currentPixel.DistanceCIE94(leftPixel) < maxColorDifference) ? 2 : 0;
+                    int isSimilarToTopPixel = (currentPixel.DistanceCIE94(topPixel) < MaxColorDistanceForMatch) ? 1 : 0;
+                    int isSimilarToLeftPixel = (currentPixel.DistanceCIE94(leftPixel) < MaxColorDistanceForMatch) ? 2 : 0;
                     int matchingPixels = isSimilarToTopPixel + isSimilarToLeftPixel;
 
                     switch (matchingPixels)
@@ -170,16 +208,20 @@ namespace HeadTracker
                     }
                 }
             }
+        }
 
-            int uniqueClustersCount = 0;
-            for (int i = 0; i < clusterIndexes.Count; i++)
-            {
-                if (i == clusterIndexes[i])
-                {
-                    uniqueClustersCount++;
-                }
-            }
+        private void RemoveSmallClusters()
+        {
 
+        }
+
+        private void MergeSimilarClusters()
+        {
+
+        }
+
+        private void FlattenClusterIndexes(List<int> clusterIndexes)
+        {
             for (int i = 0; i < clusterIndexes.Count; i++)
             {
                 int index = i;
@@ -192,12 +234,6 @@ namespace HeadTracker
                 }
 
                 clusterIndexes[i] = clusterIndex;
-            }
-
-            //Now go through all clusters and replace merged clusters with the merged cluster number
-            for (int i = 0; i < ClusterMap.Length; i++)
-            {
-                ClusterMap[i] = clusterIndexes[ClusterMap[i]];
             }
         }
 
