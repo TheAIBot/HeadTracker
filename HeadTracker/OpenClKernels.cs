@@ -9,13 +9,13 @@ namespace HeadTracker
     public static class OpenClKernels
     {
         private static readonly string RGBToLab = @"
-kernel void RGBToLab(global char* rgbPixels, global float* labPixels, float maxColorNumber)
+kernel void RGBToLab(global uchar* rgbPixels, global char* labPixels, float maxColorNumber)
 {
     int index = get_global_id(0) * 3;
 
-    float red   = convert_float_rtp(rgbPixels[index + 0]);
-    float green = convert_float_rtp(rgbPixels[index + 1]);
-    float blue  = convert_float_rtp(rgbPixels[index + 2]);
+    float red   = convert_float(rgbPixels[index + 0]);
+    float green = convert_float(rgbPixels[index + 1]);
+    float blue  = convert_float(rgbPixels[index + 2]);
 
 
     //First convert from RGB to XYZ
@@ -50,9 +50,22 @@ kernel void RGBToLab(global char* rgbPixels, global float* labPixels, float maxC
     float b = 200 * (yF - zF);
 
 
-    labPixels[index + 0] = L;
-    labPixels[index + 1] = a;
-    labPixels[index + 2] = b;
+    //Now convert to char
+    int iL = convert_int(L);
+    int ia = convert_int(a);
+    int ib = convert_int(b);
+
+    int rangedL = min(max(iL, -128), 127);
+    int rangeda = min(max(ia, -128), 127);
+    int rangedb = min(max(ib, -128), 127);
+
+    char cL = convert_char(rangedL);
+    char ca = convert_char(rangeda);
+    char cb = convert_char(rangedb);
+
+    labPixels[index + 0] = cL;
+    labPixels[index + 1] = ca;
+    labPixels[index + 2] = cb;
 }";
 
         private static readonly string LabDistances = @"
@@ -85,7 +98,7 @@ float DistanceCIE94(float L1, float a1, float b1, float L2, float a2, float b2)
     return sqrt((LRes * LRes) + (CRes * CRes) + (HRes * HRes));
 }
 
-kernel void LabDistances(global float* labPixels, global float* labDistances, int bigWidth, int bigHeight)
+kernel void LabDistances(global char* labPixels, global uchar* labDistances, int bigWidth, int bigHeight, float allowedDistance)
 {
     int index = get_global_id(0);
     
@@ -98,29 +111,33 @@ kernel void LabDistances(global float* labPixels, global float* labDistances, in
     int labDistancesIndex = (y * bigWidth + x) * 4;
 
     int centerIndex = (y * bigWidth + x) * 3;
-    float centerL = labPixels[centerIndex + 0];
-    float centera = labPixels[centerIndex + 1];
-    float centerb = labPixels[centerIndex + 2];
+    float centerL = convert_float(labPixels[centerIndex + 0]);
+    float centera = convert_float(labPixels[centerIndex + 1]);
+    float centerb = convert_float(labPixels[centerIndex + 2]);
 
-    float topL = labPixels[centerIndex - bigWidth * 3 + 0];
-    float topa = labPixels[centerIndex - bigWidth * 3 + 1];
-    float topb = labPixels[centerIndex - bigWidth * 3 + 2];
-    labDistances[labDistancesIndex + 0] = DistanceCIE94(centerL, centera, centerb, topL, topa, topb);
+    float topL = convert_float(labPixels[centerIndex - bigWidth * 3 + 0]);
+    float topa = convert_float(labPixels[centerIndex - bigWidth * 3 + 1]);
+    float topb = convert_float(labPixels[centerIndex - bigWidth * 3 + 2]);
+    float topDistance = DistanceCIE94(centerL, centera, centerb, topL, topa, topb);
+    labDistances[labDistancesIndex + 0] = topDistance <= allowedDistance;
 
-    float leftL = labPixels[centerIndex - 1 * 3 + 0];
-    float lefta = labPixels[centerIndex - 1 * 3 + 1];
-    float leftb = labPixels[centerIndex - 1 * 3 + 2];
-    labDistances[labDistancesIndex + 1] = DistanceCIE94(centerL, centera, centerb, leftL, lefta, leftb);
+    float leftL = convert_float(labPixels[centerIndex - 1 * 3 + 0]);
+    float lefta = convert_float(labPixels[centerIndex - 1 * 3 + 1]);
+    float leftb = convert_float(labPixels[centerIndex - 1 * 3 + 2]);
+    float leftDistance = DistanceCIE94(centerL, centera, centerb, leftL, lefta, leftb);
+    labDistances[labDistancesIndex + 1] = leftDistance <= allowedDistance;
 
-    float rightL = labPixels[centerIndex + 1 * 3 + 0];
-    float righta = labPixels[centerIndex + 1 * 3 + 1];
-    float rightb = labPixels[centerIndex + 1 * 3 + 2];
-    labDistances[labDistancesIndex + 2] = DistanceCIE94(centerL, centera, centerb, rightL, righta, rightb);
+    float rightL = convert_float(labPixels[centerIndex + 1 * 3 + 0]);
+    float righta = convert_float(labPixels[centerIndex + 1 * 3 + 1]);
+    float rightb = convert_float(labPixels[centerIndex + 1 * 3 + 2]);
+    float rightDistance = DistanceCIE94(centerL, centera, centerb, rightL, righta, rightb);
+    labDistances[labDistancesIndex + 2] = rightDistance <= allowedDistance;
 
-    float bottomL = labPixels[centerIndex + bigWidth * 3 + 0];
-    float bottoma = labPixels[centerIndex + bigWidth * 3 + 1];
-    float bottomb = labPixels[centerIndex + bigWidth * 3 + 2];
-    labDistances[labDistancesIndex + 3] = DistanceCIE94(centerL, centera, centerb, bottomL, bottoma, bottomb);
+    float bottomL = convert_float(labPixels[centerIndex + bigWidth * 3 + 0]);
+    float bottoma = convert_float(labPixels[centerIndex + bigWidth * 3 + 1]);
+    float bottomb = convert_float(labPixels[centerIndex + bigWidth * 3 + 2]);
+    float bottomDistance = DistanceCIE94(centerL, centera, centerb, bottomL, bottoma, bottomb);
+    labDistances[labDistancesIndex + 3] = bottomDistance <= allowedDistance;
 }";
 
         public static readonly string Kernel = RGBToLab + LabDistances;

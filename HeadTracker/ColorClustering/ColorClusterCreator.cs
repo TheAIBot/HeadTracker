@@ -13,15 +13,16 @@ namespace HeadTracker
     class ColorClusterCreator
     {
         public readonly List<ColorCluster> clusters;
-        public float MaxColorDistanceForMatch = 1.5f;
+        private float MaxColorDistanceForMatch = 1.5f;
 
-        private readonly System.Drawing.Color[] colors;
+        private readonly byte[] colors;
         private readonly int ImageWidth;
         private readonly int ImageHeight;
         private readonly byte[] RGBPixels;
-        private readonly float[] LabPixels;
-        private readonly float[] LabDistances;
+        private readonly sbyte[] LabPixels;
+        private readonly byte[] LabDistances;
         private readonly int[] ClusterMap;
+        private readonly Bitmap clusterImage;
         private readonly EasyCL gpuAccel;
         
         private const int TOP_DISTANCE_INDEX = 0;
@@ -31,19 +32,23 @@ namespace HeadTracker
 
         public ColorClusterCreator(int width, int height)
         {
-            List<System.Drawing.Color> lColors = new List<System.Drawing.Color>();
+            List<byte> lColors = new List<byte>();
             foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
             {
-                lColors.Add(System.Drawing.Color.FromKnownColor((KnownColor)colorValue));
+                System.Drawing.Color color = System.Drawing.Color.FromKnownColor((KnownColor)colorValue);
+                lColors.Add(color.R);
+                lColors.Add(color.G);
+                lColors.Add(color.B);
             }
             this.colors = lColors.ToArray();
 
             this.ImageWidth = width;
             this.ImageHeight = height;
             this.RGBPixels = new byte[ImageWidth * ImageHeight * 3];
-            this.LabPixels = new float[ImageWidth * ImageHeight * 3];
-            this.LabDistances = new float[ImageWidth * ImageHeight * 4];
+            this.LabPixels = new sbyte[ImageWidth * ImageHeight * 3];
+            this.LabDistances = new byte[ImageWidth * ImageHeight * 4];
             this.ClusterMap = new int[ImageWidth * ImageHeight];
+            clusterImage = new Bitmap(ImageWidth, ImageHeight, PixelFormat.Format24bppRgb);
 
             this.gpuAccel = new EasyCL();
             this.gpuAccel.Accelerator = AcceleratorDevice.GPU;
@@ -74,33 +79,30 @@ namespace HeadTracker
 
             unsafe
             {
-                byte* originalPtr = (byte*)originalBitmapData.Scan0;
+                byte* rowPtr = (byte*)originalBitmapData.Scan0;
                 int index = 0;
 
                 for (int y = 0; y < originalBitmapData.Height; y++)
                 {
-                    byte* originalRowPtr = originalPtr + (y * originalBitmapData.Stride);
+                    byte* pixelPtr = rowPtr;
 
                     for (int x = 0; x < originalBitmapData.Width; x++)
                     {
-                        byte* pixelPtr = originalRowPtr + (x * pixelInfo.pixelSize);
-                        //RGBPixel pixel = PixelInfo.GetPixelColorAsPixelColor(pixelPtr, pixelInfo);
-                        //int red = pixelPtr[(int)RGBAColor.Red];
-                        //int green = pixelPtr[(int)RGBAColor.Green];
-                        //int blue = pixelPtr[(int)RGBAColor.Blue];
-
                         RGBPixels[index + 0] = pixelPtr[(int)RGBAColor.Red];
                         RGBPixels[index + 1] = pixelPtr[(int)RGBAColor.Green];
                         RGBPixels[index + 2] = pixelPtr[(int)RGBAColor.Blue];
 
                         index += 3;
+                        pixelPtr += 3;
                     }
+
+                    rowPtr += originalBitmapData.Stride;
                 }
             }
             image.UnlockBits(originalBitmapData);
 
             gpuAccel.Invoke("RGBToLab", 0, LabPixels.Length / 3, RGBPixels, LabPixels, 255f);
-            gpuAccel.Invoke("LabDistances", 0, (ImageWidth - 2) * (ImageHeight - 2), LabPixels, LabDistances, ImageWidth, ImageHeight);
+            gpuAccel.Invoke("LabDistances", 0, (ImageWidth - 2) * (ImageHeight - 2), LabPixels, LabDistances, ImageWidth, ImageHeight, MaxColorDistanceForMatch);
             //for (int i = 0; i < LabPixels.Length / 3; i++)
             //{
             //    RGBToLab(RGBPixels, LabPixels, 255f, i);
@@ -158,9 +160,9 @@ namespace HeadTracker
             int ib = (int)b;
 
 
-            labPixels[index + 0] = Math.Min(Math.Max(iL, sbyte.MinValue), sbyte.MaxValue);
-            labPixels[index + 1] = Math.Min(Math.Max(iL, sbyte.MinValue), sbyte.MaxValue);
-            labPixels[index + 2] = Math.Min(Math.Max(iL, sbyte.MinValue), sbyte.MaxValue);
+            labPixels[index + 0] = (sbyte)Math.Min(Math.Max(iL, sbyte.MinValue), sbyte.MaxValue);
+            labPixels[index + 1] = (sbyte)Math.Min(Math.Max(iL, sbyte.MinValue), sbyte.MaxValue);
+            labPixels[index + 2] = (sbyte)Math.Min(Math.Max(iL, sbyte.MinValue), sbyte.MaxValue);
         }
 
 
@@ -296,7 +298,7 @@ namespace HeadTracker
                 int currentPixelIndex = x;
                 int leftPixelIndex = x - 1;
 
-                if (LabDistances[currentPixelIndex * 4 + LEFT_DISTANCE_INDEX] < MaxColorDistanceForMatch)
+                if (LabDistances[currentPixelIndex * 4 + LEFT_DISTANCE_INDEX] > 0)
                 {
                     ClusterMap[currentPixelIndex] = ClusterMap[leftPixelIndex];
                 }
@@ -313,7 +315,7 @@ namespace HeadTracker
                 int currentPixelIndex = y * ImageWidth;
                 int topPixelIndex = (y - 1) * ImageWidth;
 
-                if (LabDistances[currentPixelIndex * 4 + TOP_DISTANCE_INDEX] < MaxColorDistanceForMatch)
+                if (LabDistances[currentPixelIndex * 4 + TOP_DISTANCE_INDEX] > 0)
                 {
                     ClusterMap[currentPixelIndex] = ClusterMap[topPixelIndex];
                 }
@@ -337,9 +339,12 @@ namespace HeadTracker
                     int topPixelIndex = currentPixelIndex - ImageWidth;
                     int leftPixelIndex = currentPixelIndex - 1;
 
-                    int isSimilarToTopPixel = (LabDistances[currentPixelIndex * 4 + TOP_DISTANCE_INDEX] < MaxColorDistanceForMatch) ? 1 : 0;
-                    int isSimilarToLeftPixel = (LabDistances[currentPixelIndex * 4 + LEFT_DISTANCE_INDEX] < MaxColorDistanceForMatch) ? 2 : 0;
+                    int isSimilarToTopPixel  = LabDistances[currentPixelIndex * 4 + TOP_DISTANCE_INDEX] * 1;
+                    int isSimilarToLeftPixel = LabDistances[currentPixelIndex * 4 + LEFT_DISTANCE_INDEX] * 2;
                     int matchingPixels = isSimilarToTopPixel + isSimilarToLeftPixel;
+
+                    int topClusterIndex = ClusterMap[topPixelIndex];
+                    int leftClusterIndex = ClusterMap[leftPixelIndex];
 
                     switch (matchingPixels)
                     {
@@ -353,19 +358,19 @@ namespace HeadTracker
                         //Only top pixel match.
                         //Use cluster from top pixel.
                         case 1:
-                            ClusterMap[currentPixelIndex] = ClusterMap[topPixelIndex];
+                            ClusterMap[currentPixelIndex] = topClusterIndex;
                             break;
                         //Only left pixel match.
                         //Use cluster from left pixel.
                         case 2:
-                            ClusterMap[currentPixelIndex] = ClusterMap[leftPixelIndex];
+                            ClusterMap[currentPixelIndex] = leftClusterIndex;
                             break;
                         //Both pixels match.
                         //Merge top cluster into left cluster and then use left cluster.
                         case 3:
-                            int minClusterIndex = Math.Min(ClusterMap[topPixelIndex], ClusterMap[leftPixelIndex]);
-                            clusterIndexes[ClusterMap[topPixelIndex]] = minClusterIndex;
-                            clusterIndexes[ClusterMap[leftPixelIndex]] = minClusterIndex;
+                            int minClusterIndex = Math.Min(topClusterIndex, leftClusterIndex);
+                            clusterIndexes[topClusterIndex] = minClusterIndex;
+                            clusterIndexes[leftClusterIndex] = minClusterIndex;
                             ClusterMap[currentPixelIndex] = minClusterIndex;
                             break;
                         default:
@@ -404,35 +409,38 @@ namespace HeadTracker
 
         public Bitmap BitmapFromClusterMap()
         {
-            Bitmap withClusters = new Bitmap(ImageWidth, ImageHeight, PixelFormat.Format24bppRgb);
-
-            PixelTypeInfo pixelInfo = PixelInfo.GetPixelTypeInfo(withClusters);
-            Rectangle imageSize = new Rectangle(0, 0, withClusters.Width, withClusters.Height);
-            BitmapData originalBitmapData = withClusters.LockBits(imageSize, ImageLockMode.WriteOnly, withClusters.PixelFormat);
+            PixelTypeInfo pixelInfo = PixelInfo.GetPixelTypeInfo(clusterImage);
+            Rectangle imageSize = new Rectangle(0, 0, clusterImage.Width, clusterImage.Height);
+            BitmapData originalBitmapData = clusterImage.LockBits(imageSize, ImageLockMode.WriteOnly, clusterImage.PixelFormat);
 
             unsafe
             {
-                byte* originalPtr = (byte*)originalBitmapData.Scan0;
+                byte* rowPtr = (byte*)originalBitmapData.Scan0;
+                int clusterIndex = 0;
 
                 for (int y = 0; y < originalBitmapData.Height; y++)
                 {
-                    byte* originalRowPtr = originalPtr + (y * originalBitmapData.Stride);
+                    byte* pixelPtr = rowPtr;
 
                     for (int x = 0; x < originalBitmapData.Width; x++)
                     {
-                        byte* pixelPtr = originalRowPtr + (x * pixelInfo.pixelSize);
-                        int clusterNumber = ClusterMap[y * ImageWidth + x];
+                        int clusterNumber = ClusterMap[clusterIndex];
 
-                        System.Drawing.Color color = colors[clusterNumber % colors.Length];
-                        pixelPtr[0] = color.R;
-                        pixelPtr[1] = color.G;
-                        pixelPtr[2] = color.B;
+                        int colorIndex = (clusterNumber % (colors.Length / 3)) * 3;
+                        pixelPtr[0] = colors[colorIndex + 0];
+                        pixelPtr[1] = colors[colorIndex + 1];
+                        pixelPtr[2] = colors[colorIndex + 2];
+
+                        clusterIndex++;
+                        pixelPtr += 3;
                     }
+
+                    rowPtr += originalBitmapData.Stride;
                 }
             }
-            withClusters.UnlockBits(originalBitmapData);
+            clusterImage.UnlockBits(originalBitmapData);
 
-            return withClusters;
+            return clusterImage;
         }
 
         public List<ColorCluster> GetClustersSortedByMostRed()
@@ -454,6 +462,11 @@ namespace HeadTracker
         public List<ColorCluster> GetClustersSortedByMostBlack()
         {
             return clusters.OrderBy(x => x.ClusterColor.red + x.ClusterColor.green + x.ClusterColor.blue).ToList();
+        }
+
+        public void SetColorDistance(float distance)
+        {
+            MaxColorDistanceForMatch = distance;
         }
     }
 }
