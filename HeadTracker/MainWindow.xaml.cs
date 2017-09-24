@@ -38,52 +38,22 @@ namespace HeadTracker
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            Bitmap test = new Bitmap("test3.png");
-            for (int y = 0; y < test.Height; y++)
-            {
-                for (int x = 0; x < test.Width; x++)
-                {
-                    System.Drawing.Color a = test.GetPixel(x, y);
-                    LabPixel b = new RGBPixel(a.R, a.G, a.B).ToLabPixel();
-                    test.SetPixel(x, y, System.Drawing.Color.FromArgb(50, b.a + 128, b.b + 128));
-                }
-            }
-            test.Save("lab2.png", ImageFormat.Png);
+            Bitmap test = new Bitmap("test2.png");
+            ct = new ColorClusterCreator(test.Width, test.Height);
 
-            /*
-            List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
-            foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
-            {
-                colors.Add(System.Drawing.Color.FromKnownColor((KnownColor)colorValue));
-            }
-            Bitmap test = new Bitmap("test3.png");
             Stopwatch w = new Stopwatch();
             w.Start();
-            ColorClusterCreator ct = null;
-            //for (int i = 0; i < 5; i++)
-            //{
-                ct = new ColorClusterCreator(test);
-            //}
+
+            for (int i = 0; i < 200; i++)
+            {
+                ct.UpdateClusters(test);
+                ct.BitmapFromClusterMap();
+            }
 
             w.Stop();
-            //MessageBox.Show(w.ElapsedMilliseconds.ToString());
-            for (int i = 0; i < ct.clusters.Count; i++)
-            {
-                ColorCluster cluster = ct.clusters[i];
-                System.Drawing.Color color = colors[i % colors.Count];
-
-                foreach (PixelStretch stretch in cluster.PixelStretches)
-                {
-                    for (int x = stretch.startX; x <= stretch.endX; x++)
-                    {
-                        test.SetPixel(x, stretch.y, color);
-                    }
-                }
-            }
-            
-            test.Save("testResult4.png");
+            ct.BitmapFromClusterMap().Save("testResult.png");
             MessageBox.Show(w.ElapsedMilliseconds.ToString());
-            */
+
 
             FilterInfoCollection videoSources = new FilterInfoCollection(FilterCategory.VideoInputDevice);
 
@@ -107,11 +77,17 @@ namespace HeadTracker
                                                                        .Where(x => x.AverageFrameRate >= 10)
                                                                        .Last();
 
+            ct = new ColorClusterCreator(videoSource.VideoResolution.FrameSize.Width, videoSource.VideoResolution.FrameSize.Height);
+
             videoSource.NewFrame += new AForge.Video.NewFrameEventHandler(videoSource_NewFrame);
             videoSource.Start();
 
             infoWindow.Show();
+            infoWindow.AllowedDistanceSlider.ValueChanged += (se, ev) => dd = (float)ev.NewValue / 100.0f;
+            infoWindow.Closed += (se, ev) => this.Close();
         }
+
+        float dd = 3;
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
@@ -123,10 +99,11 @@ namespace HeadTracker
         }
 
         int number = 0;
+        ColorClusterCreator ct;
 
         private void videoSource_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
         {
-            if (number < 5)
+            if (number < 1)
             {
                 number++;
                 return;
@@ -142,82 +119,29 @@ namespace HeadTracker
                 //you'll probably get access violation exceptions
                 watch.Reset();
                 watch.Start();
-
+                
                 TempBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
 
-                ColorClusterCreator ct = new ColorClusterCreator(TempBitmap);
-                
-                List<ColorCluster> sortedByRed = ct.GetClustersSortedByMostRed();
-                System.Drawing.Point redPoint = sortedByRed.First().CenterPoint;
-
-                List<ColorCluster> sortedByGreen = ct.GetClustersSortedByMostGreen();
-                System.Drawing.Point greenPoint = sortedByGreen.First().CenterPoint;
-
-                List<ColorCluster> sortedByBlue = ct.GetClustersSortedByMostBlue();
-                System.Drawing.Point bluePoint = sortedByBlue.First().CenterPoint;
-
-                List<ColorCluster> sortedByBlack = ct.GetClustersSortedByMostBlack();
-                System.Drawing.Point blackPoint = sortedByBlack.First().CenterPoint;
-                
-                DrawClusters(TempBitmap, sortedByRed, System.Drawing.Color.Red);
-                DrawClusters(TempBitmap, sortedByGreen, System.Drawing.Color.Green);
-                DrawClusters(TempBitmap, sortedByBlue, System.Drawing.Color.Blue);
-                DrawClusters(TempBitmap, sortedByBlack, System.Drawing.Color.Black);
-                
-                using (Graphics g = Graphics.FromImage(TempBitmap))
+                try
                 {
-                    g.FillEllipse(System.Drawing.Brushes.DarkRed, redPoint.X, redPoint.Y, 10, 10);
-                    g.FillEllipse(System.Drawing.Brushes.DarkGreen, greenPoint.X, greenPoint.Y, 10, 10);
-                    g.FillEllipse(System.Drawing.Brushes.DarkBlue, bluePoint.X, bluePoint.Y, 10, 10);
-                    g.FillEllipse(System.Drawing.Brushes.Black, blackPoint.X, blackPoint.Y, 10, 10);
+                    ct.SetColorDistance(dd);
+                    ct.UpdateClusters(TempBitmap);
                 }
-                
-
-                /*
-                List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
-                foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
+                catch (Exception e)
                 {
-                    colors.Add(System.Drawing.Color.FromKnownColor((KnownColor)colorValue));
+                    Dispatcher.Invoke(() => MessageBox.Show(e.Message + Environment.NewLine + e.StackTrace));
                 }
-                for (int i = 0; i < ct.clusters.Count; i++)
-                {
-                    ColorCluster cluster = ct.clusters[i];
-                    System.Drawing.Color color = colors[i % colors.Count];
 
-                    foreach (PixelStretch stretch in cluster.PixelStretches)
-                    {
-                        for (int x = stretch.startX; x <= stretch.endX; x++)
-                        {
-                            TempBitmap.SetPixel(x, stretch.y, color);
-                        }
-                    }
-                }
-                */
 
-                Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(TempBitmap));
+                Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(ct.BitmapFromClusterMap()));
 
                 watch.Stop();
-                string fisk = (watch.ElapsedMilliseconds == 0) ? "30" : (1000 / watch.ElapsedMilliseconds).ToString();
-                //this.Invoke(new Action(() => label1.Text = fisk));
+                Dispatcher.Invoke(() => infoWindow.ClusterCreationTime.Text = "Time: " + watch.ElapsedMilliseconds);
 
             }
             catch (Exception e)
             {
                 throw;
-            }
-        }
-
-        private void DrawClusters(Bitmap image, List<ColorCluster> clusters, System.Drawing.Color color)
-        {
-            for (int i = 0; i < 2; i++)
-            {
-                foreach (PixelStretch stretch in clusters[i].PixelStretches)
-                {
-                    for (int x = stretch.startX; x <= stretch.endX; x++)
-                    {
-                        image.SetPixel(x, stretch.y, color);
-                    }
-                }
             }
         }
 

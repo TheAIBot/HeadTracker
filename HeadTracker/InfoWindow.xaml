@@ -5,9 +5,21 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HeadTracker"
         mc:Ignorable="d"
-        Title="InfoWindow" Height="300" Width="300">
+        Title="InfoWindow" WindowState="Maximized">
     <Grid>
-        <Image Name="ImageViewer"/>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Column="0" Grid.Row="0">
+            <Slider Name="AllowedDistanceSlider" HorizontalAlignment="Left"  Minimum="50" Maximum="300" Width="100" Margin="5,5,5,5"/>
+            <TextBlock Name="ClusterCreationTime" HorizontalAlignment="Left" Width="100"/>
+        </StackPanel>
+        <Image Name="ImageViewer" Grid.Column="1" Grid.Row="0"/>
 
     </Grid>
 </Window>
