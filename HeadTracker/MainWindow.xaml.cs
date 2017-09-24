@@ -38,27 +38,20 @@ namespace HeadTracker
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            //Bitmap test = new Bitmap("test2.png");
+            //ct = new ColorClusterCreator(test.Width, test.Height);
 
-            List<System.Drawing.Color> colors = new List<System.Drawing.Color>();
-            foreach (var colorValue in Enum.GetValues(typeof(KnownColor)))
-            {
-                colors.Add(System.Drawing.Color.FromKnownColor((KnownColor)colorValue));
-            }
+            //Stopwatch w = new Stopwatch();
+            //w.Start();
 
-            Bitmap test = new Bitmap("test2.png");
-            ColorClusterCreator ct = new ColorClusterCreator(test.Width, test.Height);
+            //for (int i = 0; i < 50; i++)
+            //{
+            //    ct.UpdateClusters(test);
+            //}
 
-            Stopwatch w = new Stopwatch();
-            w.Start();
-
-            for (int i = 0; i < 10; i++)
-            {
-                ct.UpdateClusters(test);
-            }
-
-            w.Stop();
-            ct.BitmapFromClusterMap().Save("testResult.png");
-            MessageBox.Show(w.ElapsedMilliseconds.ToString());
+            //w.Stop();
+            //ct.BitmapFromClusterMap().Save("testResult.png");
+            //MessageBox.Show(w.ElapsedMilliseconds.ToString());
 
 
             FilterInfoCollection videoSources = new FilterInfoCollection(FilterCategory.VideoInputDevice);
@@ -89,11 +82,11 @@ namespace HeadTracker
             videoSource.Start();
 
             infoWindow.Show();
-            infoWindow.AllowedDistanceSlider.ValueChanged += (se, ev) => dd = ev.NewValue / 100.0;
+            infoWindow.AllowedDistanceSlider.ValueChanged += (se, ev) => dd = (float)ev.NewValue / 100.0f;
             infoWindow.Closed += (se, ev) => this.Close();
         }
 
-        double dd = 3;
+        float dd = 3;
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
