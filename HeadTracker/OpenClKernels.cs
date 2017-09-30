@@ -79,7 +79,8 @@ float DistanceCIE94(float L1, float a1, float b1, float L2, float a2, float b2)
     float Deltaa = a1 - a2;
     float Deltab = b1 - b2;
 
-    float DeltaHab = sqrt((Deltaa * Deltaa) + (Deltab * Deltab) - (DeltaCab * DeltaCab));
+    float beforeDeltaHab = (Deltaa * Deltaa) + (Deltab * Deltab) - (DeltaCab * DeltaCab);
+    float DeltaHab = (beforeDeltaHab < 0) ? 0 : sqrt(beforeDeltaHab);
 
     const float kL = 1;
     const float kC = 1;
@@ -95,7 +96,8 @@ float DistanceCIE94(float L1, float a1, float b1, float L2, float a2, float b2)
     float CRes = DeltaCab / (kC * SC);
     float HRes = DeltaHab / (kH * SH);
 
-    return sqrt((LRes * LRes) + (CRes * CRes) + (HRes * HRes));
+    float beforeReturn = (LRes * LRes) + (CRes * CRes) + (HRes * HRes);
+    return beforeReturn < 0 ? 0 : sqrt(beforeReturn);
 }
 
 kernel void LabDistances(global char* labPixels, global uchar* labDistances, int bigWidth, int bigHeight, float allowedDistance)

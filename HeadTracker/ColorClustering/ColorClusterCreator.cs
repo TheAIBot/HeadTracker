@@ -103,166 +103,7 @@ namespace HeadTracker
 
             gpuAccel.Invoke("RGBToLab", 0, LabPixels.Length / 3, RGBPixels, LabPixels, 255f);
             gpuAccel.Invoke("LabDistances", 0, (ImageWidth - 2) * (ImageHeight - 2), LabPixels, LabDistances, ImageWidth, ImageHeight, MaxColorDistanceForMatch);
-            //for (int i = 0; i < LabPixels.Length / 3; i++)
-            //{
-            //    RGBToLab(RGBPixels, LabPixels, 255f, i);
-            //}
-            //for (int i = 0; i < (ImageWidth - 2) * (ImageHeight - 2); i++)
-            //{
-            //    CalcLabDistances(LabPixels, LabDistances, ImageWidth, ImageHeight, i);
-            //}
         }
-
-
-
-        void RGBToLab(byte[] rgbPixels, float[] labPixels, float maxColorNumber, int index)
-        {
-            index = index * 3;
-
-            float red = rgbPixels[index + 0];
-            float green = rgbPixels[index + 1];
-            float blue = rgbPixels[index + 2];
-
-
-            //First convert from RGB to XYZ
-            float sR = red / maxColorNumber;
-            float sG = green / maxColorNumber;
-            float sB = blue / maxColorNumber;
-
-            float rLinear = (sR > 0.04045f) ? (float)Math.Pow((sR + 0.055) / 1.055, 2.4) : sR / 12.92f;
-            float gLinear = (sG > 0.04045f) ? (float)Math.Pow((sG + 0.055) / 1.055, 2.4) : sG / 12.92f;
-            float bLinear = (sB > 0.04045f) ? (float)Math.Pow((sB + 0.055) / 1.055, 2.4) : sB / 12.92f;
-
-            float X = rLinear * 0.4124f + gLinear * 0.3576f + bLinear * 0.1805f;
-            float Y = rLinear * 0.2126f + gLinear * 0.7152f + bLinear * 0.0722f;
-            float Z = rLinear * 0.0193f + gLinear * 0.1192f + bLinear * 0.9505f;
-
-
-            //Then convert from XYZ to Lab
-            const float xRef = 0.95047f;
-            const float yRef = 1.00f;
-            const float zRef = 1.08883f;
-
-            float xReffed = X / xRef;
-            float yReffed = Y / yRef;
-            float zReffed = Z / zRef;
-
-            float xF = (xReffed > 0.008856f) ? (float)Math.Pow(xReffed, 1 / 3.0f) : (7.787f * xReffed) + (4 / 29.0f);
-            float yF = (yReffed > 0.008856f) ? (float)Math.Pow(yReffed, 1 / 3.0f) : (7.787f * yReffed) + (4 / 29.0f);
-            float zF = (zReffed > 0.008856f) ? (float)Math.Pow(zReffed, 1 / 3.0f) : (7.787f * zReffed) + (4 / 29.0f);
-
-            float L = 116 * yF - 16;
-            float a = 500 * (xF - yF);
-            float b = 200 * (yF - zF);
-
-            int iL = (int)L;
-            int ia = (int)a;
-            int ib = (int)b;
-
-
-            labPixels[index + 0] = (sbyte)Math.Min(Math.Max(iL, sbyte.MinValue), sbyte.MaxValue);
-            labPixels[index + 1] = (sbyte)Math.Min(Math.Max(iL, sbyte.MinValue), sbyte.MaxValue);
-            labPixels[index + 2] = (sbyte)Math.Min(Math.Max(iL, sbyte.MinValue), sbyte.MaxValue);
-        }
-
-
-
-        float DistanceCIE94(float L1, float a1, float b1, float L2, float a2, float b2)
-        {
-            float C1 = (float)Math.Sqrt((a1 * a1) + (b1 * b1));
-            float C2 = (float)Math.Sqrt((a2 * a2) + (b2 * b2));
-            float DeltaCab = C1 - C2;
-
-            float DeltaL = L1 - L2;
-            float Deltaa = a1 - a2;
-            float Deltab = b1 - b2;
-
-            float DeltaHab = (float)Math.Sqrt((Deltaa * Deltaa) + (Deltab * Deltab) - (DeltaCab * DeltaCab));
-
-            const float kL = 1;
-            const float kC = 1;
-            const float kH = 1;
-            const float K1 = 0.045f;
-            const float K2 = 0.015f;
-
-            float SL = 1;
-            float SC = 1 + K1 * C1;
-            float SH = 1 + K2 * C1;
-
-            float LRes = DeltaL / (kL * SL);
-            float CRes = DeltaCab / (kC * SC);
-            float HRes = DeltaHab / (kH * SH);
-
-            float f = (float)Math.Sqrt((LRes * LRes) + (CRes * CRes) + (HRes * HRes));
-            return f;
-        }
-
-        void CalcLabDistances(float[] labPixels, float[] labDistances, int bigWidth, int bigHeight, int index)
-        {
-            //int index = get_global_id(0);
-
-            int smallWidth = bigWidth - 2;
-            int smallHeight = bigHeight - 2;
-
-            int x = (index % smallWidth) + 1;
-            int y = (index / smallWidth) + 1;
-
-            int labDistancesIndex = (y * bigWidth + x) * 4;
-
-            int centerIndex = (y * bigWidth + x) * 3;
-            float centerL = labPixels[centerIndex + 0];
-            float centera = labPixels[centerIndex + 1];
-            float centerb = labPixels[centerIndex + 2];
-
-            int topIndex = centerIndex - bigWidth * 3;
-            float topL = labPixels[topIndex + 0];
-            float topa = labPixels[topIndex + 1];
-            float topb = labPixels[topIndex + 2];
-            labDistances[labDistancesIndex + 0] = DistanceCIE94(centerL, centera, centerb, topL, topa, topb);
-
-            int leftIndex = centerIndex - 1 * 3;
-            float leftL = labPixels[leftIndex + 0];
-            float lefta = labPixels[leftIndex + 1];
-            float leftb = labPixels[leftIndex + 2];
-            labDistances[labDistancesIndex + 1] = DistanceCIE94(centerL, centera, centerb, leftL, lefta, leftb);
-
-            int rightIndex = centerIndex + 1 * 3;
-            float rightL = labPixels[rightIndex + 0];
-            float righta = labPixels[rightIndex + 1];
-            float rightb = labPixels[rightIndex + 2];
-            if (index == 6719)
-            {
-
-            }
-            labDistances[labDistancesIndex + 2] = DistanceCIE94(centerL, centera, centerb, rightL, righta, rightb);
-
-            int bottomIndex = centerIndex + bigWidth * 3;
-            float bottomL = labPixels[bottomIndex + 0];
-            float bottoma = labPixels[bottomIndex + 1];
-            float bottomb = labPixels[bottomIndex + 2];
-            labDistances[labDistancesIndex + 3] = DistanceCIE94(centerL, centera, centerb, bottomL, bottoma, bottomb);
-
-            if (float.IsNaN(labDistances[index * 4 + 0]))
-            {
-
-            }
-            if (float.IsNaN(labDistances[index * 4 + 1]))
-            {
-
-            }
-            if (float.IsNaN(labDistances[index * 4 + 2]))
-            {
-
-            }
-            if (float.IsNaN(labDistances[index * 4 + 3]))
-            {
-
-            }
-        }
-
-
-
-
 
         private void CreateClusterMap()
         {
@@ -279,7 +120,6 @@ namespace HeadTracker
             InitClusterMapClusters(clusterIndexes, ref clusterCount);
             FinishClusterMap(clusterIndexes, ref clusterCount);
 
-            RemoveSmallClusters();
             MergeSimilarClusters();
 
             FlattenClusterIndexes(clusterIndexes);
@@ -369,8 +209,8 @@ namespace HeadTracker
                         //Merge top cluster into left cluster and then use left cluster.
                         case 3:
                             int minClusterIndex = Math.Min(topClusterIndex, leftClusterIndex);
-                            clusterIndexes[topClusterIndex] = minClusterIndex;
-                            clusterIndexes[leftClusterIndex] = minClusterIndex;
+                            clusterIndexes[topClusterIndex] = clusterIndexes[minClusterIndex];
+                            clusterIndexes[leftClusterIndex] = clusterIndexes[minClusterIndex];
                             ClusterMap[currentPixelIndex] = minClusterIndex;
                             break;
                         default:
@@ -378,11 +218,6 @@ namespace HeadTracker
                     }
                 }
             }
-        }
-
-        private void RemoveSmallClusters()
-        {
-
         }
 
         private void MergeSimilarClusters()
@@ -416,7 +251,7 @@ namespace HeadTracker
             unsafe
             {
                 byte* rowPtr = (byte*)originalBitmapData.Scan0;
-                int clusterIndex = 0;
+                int pixelIndex = 0;
 
                 for (int y = 0; y < originalBitmapData.Height; y++)
                 {
@@ -424,14 +259,25 @@ namespace HeadTracker
 
                     for (int x = 0; x < originalBitmapData.Width; x++)
                     {
-                        int clusterNumber = ClusterMap[clusterIndex];
+                        int clusterNumber = ClusterMap[pixelIndex];
 
                         int colorIndex = (clusterNumber % (colors.Length / 3)) * 3;
                         pixelPtr[0] = colors[colorIndex + 0];
                         pixelPtr[1] = colors[colorIndex + 1];
                         pixelPtr[2] = colors[colorIndex + 2];
 
-                        clusterIndex++;
+                        //byte d1 = LabDistances[pixelIndex * 4 + 0];
+                        //byte d2 = LabDistances[pixelIndex * 4 + 1];
+                        ////byte d3 = LabDistances[pixelIndex * 4 + 2];
+                        ////byte d4 = LabDistances[pixelIndex * 4 + 3];
+                        //byte sum = (byte)((d1 + d2/* + d3 + d4*/) * 10);
+                        //byte value = Math.Min(sum, byte.MaxValue);
+
+                        //pixelPtr[0] = value;
+                        //pixelPtr[1] = value;
+                        //pixelPtr[2] = value;
+
+                        pixelIndex++;
                         pixelPtr += 3;
                     }
 

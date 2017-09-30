@@ -38,21 +38,21 @@ namespace HeadTracker
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            //Bitmap test = new Bitmap("test2.png");
-            //ct = new ColorClusterCreator(test.Width, test.Height);
+            Bitmap test = new Bitmap("test2.png");
+            ct = new ColorClusterCreator(test.Width, test.Height);
 
-            //Stopwatch w = new Stopwatch();
-            //w.Start();
+            Stopwatch w = new Stopwatch();
+            w.Start();
 
-            //for (int i = 0; i < 200; i++)
-            //{
-            //    ct.UpdateClusters(test);
-            //    ct.BitmapFromClusterMap();
-            //}
+            for (int i = 0; i < 1; i++)
+            {
+                ct.UpdateClusters(test);
+                ct.BitmapFromClusterMap();
+            }
 
-            //w.Stop();
-            //ct.BitmapFromClusterMap().Save("testResult.png");
-            //MessageBox.Show(w.ElapsedMilliseconds.ToString());
+            w.Stop();
+            ct.BitmapFromClusterMap().Save("testResult.png");
+            MessageBox.Show(w.ElapsedMilliseconds.ToString());
 
 
             FilterInfoCollection videoSources = new FilterInfoCollection(FilterCategory.VideoInputDevice);
@@ -73,8 +73,8 @@ namespace HeadTracker
 
             //select highest resolution with atleast 10 fps.
             //it's a random balance between resolution and fps.
-            videoSource.VideoResolution = videoSource.VideoCapabilities.OrderBy(x => x.FrameSize.Height + x.FrameSize.Width)
-                                                                       .Where(x => x.AverageFrameRate >= 10)
+            videoSource.VideoResolution = videoSource.VideoCapabilities.OrderBy(x => x.FrameSize.Height * x.FrameSize.Width)
+                                                                       //.Where(x => x.AverageFrameRate >= 10)
                                                                        .Last();
 
             ct = new ColorClusterCreator(videoSource.VideoResolution.FrameSize.Width, videoSource.VideoResolution.FrameSize.Height);
@@ -103,7 +103,7 @@ namespace HeadTracker
 
         private void videoSource_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
         {
-            if (number < 1)
+            if (number < 0)
             {
                 number++;
                 return;
