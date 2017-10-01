@@ -13,7 +13,9 @@ namespace HeadTracker
     class ColorClusterCreator
     {
         public readonly List<ColorCluster> clusters;
+        private ClusterViewTypes ViewType;
         private float MaxColorDistanceForMatch = 1.5f;
+        private readonly Object Locker = new object();
 
         private readonly byte[] colors;
         private readonly int ImageWidth;
@@ -63,8 +65,11 @@ namespace HeadTracker
                 throw new ArgumentException("Image width and height doesn't correspond with the expected width and height.");
             }
 
-            ToLabPixels(image);
-            CreateClusterMap();
+            lock (Locker)
+            {
+                ToLabPixels(image);
+                CreateClusterMap();
+            }
         }
 
         private void ToLabPixels(Bitmap image)
@@ -240,6 +245,8 @@ namespace HeadTracker
 
                 clusterIndexes[i] = clusterIndex;
             }
+
+
         }
 
         public Bitmap BitmapFromClusterMap()
@@ -261,21 +268,30 @@ namespace HeadTracker
                     {
                         int clusterNumber = ClusterMap[pixelIndex];
 
-                        int colorIndex = (clusterNumber % (colors.Length / 3)) * 3;
-                        pixelPtr[0] = colors[colorIndex + 0];
-                        pixelPtr[1] = colors[colorIndex + 1];
-                        pixelPtr[2] = colors[colorIndex + 2];
+                        if (ViewType == ClusterViewTypes.Clusters)
+                        {
+                            int colorIndex = (clusterNumber % (colors.Length / 3)) * 3;
+                            pixelPtr[0] = colors[colorIndex + 0];
+                            pixelPtr[1] = colors[colorIndex + 1];
+                            pixelPtr[2] = colors[colorIndex + 2];
+                        }
+                        else if(ViewType == ClusterViewTypes.PixelDistances)
+                        {
+                            byte d1 = LabDistances[pixelIndex * 4 + 0];
+                            byte d2 = LabDistances[pixelIndex * 4 + 1];
+                            byte d3 = LabDistances[pixelIndex * 4 + 2];
+                            byte d4 = LabDistances[pixelIndex * 4 + 3];
+                            byte sum = (byte)((d1 + d2 + d3 + d4) * 50);
+                            byte value = Math.Min(sum, byte.MaxValue);
 
-                        //byte d1 = LabDistances[pixelIndex * 4 + 0];
-                        //byte d2 = LabDistances[pixelIndex * 4 + 1];
-                        ////byte d3 = LabDistances[pixelIndex * 4 + 2];
-                        ////byte d4 = LabDistances[pixelIndex * 4 + 3];
-                        //byte sum = (byte)((d1 + d2/* + d3 + d4*/) * 10);
-                        //byte value = Math.Min(sum, byte.MaxValue);
+                            pixelPtr[0] = value;
+                            pixelPtr[1] = value;
+                            pixelPtr[2] = value;
+                        }
 
-                        //pixelPtr[0] = value;
-                        //pixelPtr[1] = value;
-                        //pixelPtr[2] = value;
+
+
+
 
                         pixelIndex++;
                         pixelPtr += 3;
@@ -312,7 +328,23 @@ namespace HeadTracker
 
         public void SetColorDistance(float distance)
         {
-            MaxColorDistanceForMatch = distance;
+            lock (Locker)
+            {
+                MaxColorDistanceForMatch = distance;
+            }
+        }
+
+        public void SetClusterViewType(ClusterViewTypes viewType)
+        {
+            lock (Locker)
+            {
+                ViewType = viewType;
+            }
+        }
+
+        public int[] GetClusterMap()
+        {
+            return ClusterMap;
         }
     }
 }

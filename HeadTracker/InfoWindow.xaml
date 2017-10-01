@@ -18,6 +18,11 @@
         <StackPanel Grid.Column="0" Grid.Row="0">
             <Slider Name="AllowedDistanceSlider" HorizontalAlignment="Left"  Minimum="50" Maximum="300" Width="100" Margin="5,5,5,5"/>
             <TextBlock Name="ClusterCreationTime" HorizontalAlignment="Left" Width="100"/>
+            <ComboBox Name="ClusterView" Margin="5,5,5,5">
+                <ComboBoxItem IsSelected="True">Show clusters</ComboBoxItem>
+                <ComboBoxItem>Show disrances</ComboBoxItem>
+            </ComboBox>
+
         </StackPanel>
         <Image Name="ImageViewer" Grid.Column="1" Grid.Row="0"/>
 

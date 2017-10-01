@@ -67,6 +67,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="ColorClustering\ClusterViewTypes.cs" />
     <Compile Include="ColorClustering\ColorCluster.cs" />
     <Compile Include="ColorClustering\ColorClusterInitData.cs" />
     <Compile Include="ColorClustering\ColorClusterCreator.cs" />

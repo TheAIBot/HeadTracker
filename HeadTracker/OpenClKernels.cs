@@ -8,7 +8,7 @@ namespace HeadTracker
 {
     public static class OpenClKernels
     {
-        private static readonly string RGBToLab = @"
+        private const string RGBToLab = @"
 kernel void RGBToLab(global uchar* rgbPixels, global char* labPixels, float maxColorNumber)
 {
     int index = get_global_id(0) * 3;
@@ -68,7 +68,7 @@ kernel void RGBToLab(global uchar* rgbPixels, global char* labPixels, float maxC
     labPixels[index + 2] = cb;
 }";
 
-        private static readonly string LabDistances = @"
+        private const string LabDistances = @"
 float DistanceCIE94(float L1, float a1, float b1, float L2, float a2, float b2)
 {
     float C1 = sqrt((a1 * a1) + (b1 * b1));
@@ -142,6 +142,6 @@ kernel void LabDistances(global char* labPixels, global uchar* labDistances, int
     labDistances[labDistancesIndex + 3] = bottomDistance <= allowedDistance;
 }";
 
-        public static readonly string Kernel = RGBToLab + LabDistances;
+        public const string Kernel = RGBToLab + LabDistances;
     }
 }

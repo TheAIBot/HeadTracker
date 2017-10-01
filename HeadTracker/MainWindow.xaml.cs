@@ -31,6 +31,10 @@ namespace HeadTracker
         private readonly Stopwatch watch = new Stopwatch();
         private readonly InfoWindow infoWindow = new InfoWindow();
 
+        private int SkippedFrames = 0;
+        private const int FRAMES_TO_SKIP = 0;
+        private ColorClusterCreator ct;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -38,21 +42,21 @@ namespace HeadTracker
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            Bitmap test = new Bitmap("test2.png");
-            ct = new ColorClusterCreator(test.Width, test.Height);
+            //Bitmap test = new Bitmap("test2.png");
+            //ct = new ColorClusterCreator(test.Width, test.Height);
 
-            Stopwatch w = new Stopwatch();
-            w.Start();
+            //Stopwatch w = new Stopwatch();
+            //w.Start();
 
-            for (int i = 0; i < 1; i++)
-            {
-                ct.UpdateClusters(test);
-                ct.BitmapFromClusterMap();
-            }
+            //for (int i = 0; i < 1; i++)
+            //{
+            //    ct.UpdateClusters(test);
+            //    ct.BitmapFromClusterMap();
+            //}
 
-            w.Stop();
-            ct.BitmapFromClusterMap().Save("testResult.png");
-            MessageBox.Show(w.ElapsedMilliseconds.ToString());
+            //w.Stop();
+            //ct.BitmapFromClusterMap().Save("testResult.png");
+            //MessageBox.Show(w.ElapsedMilliseconds.ToString());
 
 
             FilterInfoCollection videoSources = new FilterInfoCollection(FilterCategory.VideoInputDevice);
@@ -60,6 +64,7 @@ namespace HeadTracker
             if (videoSources == null)
             {
                 MessageBox.Show("No webcam found.");
+                return;
             }
 
             //assume for now that the first source is the webcam
@@ -69,13 +74,21 @@ namespace HeadTracker
             if (videoSource.VideoCapabilities.Length == 0)
             {
                 MessageBox.Show("No webcam found.");
+                return;
             }
 
             //select highest resolution with atleast 10 fps.
             //it's a random balance between resolution and fps.
-            videoSource.VideoResolution = videoSource.VideoCapabilities.OrderBy(x => x.FrameSize.Height * x.FrameSize.Width)
+            VideoCapabilities videoInput = videoSource.VideoCapabilities.OrderBy(x => x.FrameSize.Height * x.FrameSize.Width)
                                                                        //.Where(x => x.AverageFrameRate >= 10)
-                                                                       .Last();
+                                                                       .Where(x => x.BitCount == 24)
+                                                                       .LastOrDefault();
+            if (videoInput == default(VideoCapabilities))
+            {
+                MessageBox.Show("Webcam doesn't support the required image format.");
+                return;
+            }
+            videoSource.VideoResolution = videoInput;
 
             ct = new ColorClusterCreator(videoSource.VideoResolution.FrameSize.Width, videoSource.VideoResolution.FrameSize.Height);
 
@@ -83,34 +96,21 @@ namespace HeadTracker
             videoSource.Start();
 
             infoWindow.Show();
-            infoWindow.AllowedDistanceSlider.ValueChanged += (se, ev) => dd = (float)ev.NewValue / 100.0f;
+            infoWindow.AllowedDistanceSlider.ValueChanged += (se, ev) => ct.SetColorDistance((float)ev.NewValue / 100.0f);
+            infoWindow.ClusterView.SelectionChanged += (se, ev) => ct.SetClusterViewType((ClusterViewTypes)((ComboBox)se).SelectedIndex);
             infoWindow.Closed += (se, ev) => this.Close();
         }
 
-        float dd = 3;
-
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            //Stop and free the webcam object if application is closing
-            if (videoSource != null && videoSource.IsRunning)
-            {
-                videoSource.SignalToStop();
-            }
-        }
-
-        int number = 0;
-        ColorClusterCreator ct;
-
         private void videoSource_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
         {
-            if (number < 0)
+            if (SkippedFrames < FRAMES_TO_SKIP)
             {
-                number++;
+                SkippedFrames++;
                 return;
             }
             else
             {
-                number = 0;
+                SkippedFrames = 0;
             }
             try
             {
@@ -124,7 +124,6 @@ namespace HeadTracker
 
                 try
                 {
-                    ct.SetColorDistance(dd);
                     ct.UpdateClusters(TempBitmap);
                 }
                 catch (Exception e)
@@ -155,6 +154,15 @@ namespace HeadTracker
             image.StreamSource = ms;
             image.EndInit();
             return image;
+        }
+
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            //Stop and free the webcam object if application is closing
+            if (videoSource != null && videoSource.IsRunning)
+            {
+                videoSource.SignalToStop();
+            }
         }
     }
 }
