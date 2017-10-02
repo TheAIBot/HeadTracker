@@ -4,10 +4,21 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeadTracker", "HeadTracker\HeadTracker.csproj", "{E7D80C87-2BB3-4C2F-B8D6-340CA47C2976}"
+	ProjectSection(ProjectDependencies) = postProject
+		{5091D200-A9B9-4E67-BF18-9A074C4778E4} = {5091D200-A9B9-4E67-BF18-9A074C4778E4}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageInfo", "..\..\Klasser\PixelInfo\ImageInfo.csproj", "{3ED1E7F7-009D-49A9-A753-A906A1FC041C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{EEDB9674-453A-46FC-AE35-DB5534DD8149}"
+	ProjectSection(ProjectDependencies) = postProject
+		{5091D200-A9B9-4E67-BF18-9A074C4778E4} = {5091D200-A9B9-4E67-BF18-9A074C4778E4}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Clustering", "..\..\Klasser\Clustering\Clustering.csproj", "{5091D200-A9B9-4E67-BF18-9A074C4778E4}"
+	ProjectSection(ProjectDependencies) = postProject
+		{3ED1E7F7-009D-49A9-A753-A906A1FC041C} = {3ED1E7F7-009D-49A9-A753-A906A1FC041C}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,6 +38,10 @@ Global
 		{EEDB9674-453A-46FC-AE35-DB5534DD8149}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EEDB9674-453A-46FC-AE35-DB5534DD8149}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EEDB9674-453A-46FC-AE35-DB5534DD8149}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5091D200-A9B9-4E67-BF18-9A074C4778E4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5091D200-A9B9-4E67-BF18-9A074C4778E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5091D200-A9B9-4E67-BF18-9A074C4778E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5091D200-A9B9-4E67-BF18-9A074C4778E4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

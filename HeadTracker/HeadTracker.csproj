@@ -43,6 +43,9 @@
     <Reference Include="AForge.Video.DirectShow">
       <HintPath>..\..\..\Klasser\AForge.NET Framework-2.2.5-(libs only)\Release\AForge.Video.DirectShow.dll</HintPath>
     </Reference>
+    <Reference Include="Clustering">
+      <HintPath>..\..\..\Klasser\Clustering\bin\Debug\Clustering.dll</HintPath>
+    </Reference>
     <Reference Include="OpenCLlib">
       <HintPath>..\..\..\Klasser\OpenCLlib\bin\Release\OpenCLlib.dll</HintPath>
     </Reference>
@@ -67,14 +70,6 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="ColorClustering\ClusterViewTypes.cs" />
-    <Compile Include="ColorClustering\ColorCluster.cs" />
-    <Compile Include="ColorClustering\ColorClusterInitData.cs" />
-    <Compile Include="ColorClustering\ColorClusterCreator.cs" />
-    <Compile Include="ColorPoint.cs" />
-    <Compile Include="ColorClustering\PixelStretch.cs" />
-    <Compile Include="OpenClKernels.cs" />
-    <Compile Include="Tracker.cs" />
     <Page Include="InfoWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

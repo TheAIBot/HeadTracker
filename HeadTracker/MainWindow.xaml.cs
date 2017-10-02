@@ -19,6 +19,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using Clustering;
 
 namespace HeadTracker
 {
@@ -32,7 +33,7 @@ namespace HeadTracker
         private readonly InfoWindow infoWindow = new InfoWindow();
 
         private int SkippedFrames = 0;
-        private const int FRAMES_TO_SKIP = 0;
+        private const int FRAMES_TO_SKIP = 1;
         private ColorClusterCreator ct;
 
         public MainWindow()
@@ -112,36 +113,50 @@ namespace HeadTracker
             {
                 SkippedFrames = 0;
             }
+
+            //Cast the frame as Bitmap object and don't forget to use ".Clone()" otherwise
+            Bitmap TempBitmap = (Bitmap)eventArgs.Frame.Clone();
+            //you'll probably get access violation exceptions
+            watch.Reset();
+            watch.Start();
+                
+            TempBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
+
             try
             {
-                //Cast the frame as Bitmap object and don't forget to use ".Clone()" otherwise
-                Bitmap TempBitmap = (Bitmap)eventArgs.Frame.Clone();
-                //you'll probably get access violation exceptions
-                watch.Reset();
-                watch.Start();
-                
-                TempBitmap.RotateFlip(RotateFlipType.RotateNoneFlipX);
+                ct.UpdateClusters(TempBitmap);
+                Bitmap withClusters = ct.BitmapFromClusterMap();
 
-                try
+                List<ColorCluster> sortedByRed = ct.GetClustersSortedByMostRed();
+                System.Drawing.Point redPoint = sortedByRed.First().CenterPoint;
+
+                List<ColorCluster> sortedByGreen = ct.GetClustersSortedByMostGreen();
+                System.Drawing.Point greenPoint = sortedByGreen.First().CenterPoint;
+
+                List<ColorCluster> sortedByBlue = ct.GetClustersSortedByMostBlue();
+                System.Drawing.Point bluePoint = sortedByBlue.First().CenterPoint;
+
+                List<ColorCluster> sortedByBlack = ct.GetClustersSortedByMostBlack();
+                System.Drawing.Point blackPoint = sortedByBlack.First().CenterPoint;
+
+                using (Graphics g = Graphics.FromImage(withClusters))
                 {
-                    ct.UpdateClusters(TempBitmap);
+                    g.FillEllipse(System.Drawing.Brushes.DarkRed, redPoint.X - 5, redPoint.Y - 5, 10, 10);
+                    g.FillEllipse(System.Drawing.Brushes.DarkGreen, greenPoint.X - 5, greenPoint.Y - 5, 10, 10);
+                    g.FillEllipse(System.Drawing.Brushes.DarkBlue, bluePoint.X - 5, bluePoint.Y - 5, 10, 10);
+                    g.FillEllipse(System.Drawing.Brushes.White, blackPoint.X - 5, blackPoint.Y - 5, 10, 10);
                 }
-                catch (Exception e)
-                {
-                    Dispatcher.Invoke(() => MessageBox.Show(e.Message + Environment.NewLine + e.StackTrace));
-                }
 
-
-                Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(ct.BitmapFromClusterMap()));
-
-                watch.Stop();
-                Dispatcher.Invoke(() => infoWindow.ClusterCreationTime.Text = "Time: " + watch.ElapsedMilliseconds);
-
+                Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(withClusters));
             }
             catch (Exception e)
             {
-                throw;
+                Dispatcher.Invoke(() => MessageBox.Show(e.Message + Environment.NewLine + e.StackTrace));
             }
+
+            watch.Stop();
+            Dispatcher.Invoke(() => infoWindow.ClusterCreationTime.Text = "Time: " + watch.ElapsedMilliseconds);
+            Dispatcher.Invoke(() => infoWindow.ClusterCount.Text = "Cluster Count: " + ct.clusters.Count);
         }
 
         public BitmapImage Convert(Bitmap src)
