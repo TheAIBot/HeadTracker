@@ -43,6 +43,7 @@ namespace HeadTracker
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            var fisk = RotatePoints90DegAroundOrigo(new PointF(824, 1026), new PointF(274, 535));
             //Bitmap test = new Bitmap("test2.png");
             //ct = new ColorClusterCreator(test.Width, test.Height);
 
@@ -102,6 +103,57 @@ namespace HeadTracker
             infoWindow.Closed += (se, ev) => this.Close();
         }
 
+        /// <summary>
+        /// Reference: http://mathworld.wolfram.com/Point-LineDistance2-Dimensional.html equation 14
+        /// </summary>
+        /// <param name="p1"></param>
+        /// <param name="p2"></param>
+        /// <param name="p0"></param>
+        /// <returns></returns>
+        private float DistanceFromLineToPoint(System.Drawing.PointF p1, System.Drawing.PointF p2, System.Drawing.PointF p0)
+        {
+            float p12XDiff = p2.X - p1.X;
+            float p12YDiff = p2.Y - p1.Y;
+
+            float p01XDiff = p1.X - p0.X;
+            float p01YDiff = p1.Y - p0.Y;
+            
+            return (float)(Math.Abs(p12XDiff * p01YDiff - p01XDiff * p12YDiff) / Math.Sqrt(p12XDiff * p12XDiff + p12YDiff * p12YDiff));
+        }
+
+        private (PointF a, PointF b) RotatePoints90DegAroundOrigo(PointF a, PointF b)
+        {
+            //center of the two points
+            float centerX = (a.X + b.X) / 2;
+            float centerY = (a.Y + b.Y) / 2;
+
+
+            //push points to around origo
+            float origoAX = a.X - centerX;
+            float origoAY = a.Y - centerY;
+
+            float origoBX = b.X - centerX;
+            float origoBY = b.Y - centerY;
+
+
+            //rotate points 90deg
+            float rotatedOrigoAX = origoAY;
+            float rotatedOrigoAY = -origoAX;
+
+            float rotatedOrigoBX = origoBY;
+            float rotatedOrigoBY = -origoBX;
+
+
+            //now move back to the center
+            float rotatedAX = rotatedOrigoAX + centerX;
+            float rotatedAY = rotatedOrigoAY + centerY;
+
+            float rotatedBX = rotatedOrigoBX + centerX;
+            float rotatedBY = rotatedOrigoBY + centerY;
+
+            return (new PointF(rotatedAX, rotatedAY), new PointF(rotatedBX, rotatedBY));
+        }
+
         private void videoSource_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
         {
             if (SkippedFrames < FRAMES_TO_SKIP)
@@ -127,24 +179,107 @@ namespace HeadTracker
                 ct.UpdateClusters(TempBitmap);
                 Bitmap withClusters = ct.BitmapFromClusterMap();
 
+                int biggetClusterSize = ct.clusters.Max(x => x.ClusterSize);
+                ColorCluster backgroundCluster = ct.clusters.Single(x => x.ClusterSize == biggetClusterSize);
+                ct.clusters.Remove(backgroundCluster);
+
+
                 List<ColorCluster> sortedByRed = ct.GetClustersSortedByMostRed();
-                System.Drawing.Point redPoint = sortedByRed.First().CenterPoint;
-
                 List<ColorCluster> sortedByGreen = ct.GetClustersSortedByMostGreen();
-                System.Drawing.Point greenPoint = sortedByGreen.First().CenterPoint;
-
                 List<ColorCluster> sortedByBlue = ct.GetClustersSortedByMostBlue();
-                System.Drawing.Point bluePoint = sortedByBlue.First().CenterPoint;
-
                 List<ColorCluster> sortedByBlack = ct.GetClustersSortedByMostBlack();
-                System.Drawing.Point blackPoint = sortedByBlack.First().CenterPoint;
 
-                using (Graphics g = Graphics.FromImage(withClusters))
+                (ColorCluster red, ColorCluster green, ColorCluster blue, ColorCluster black, float distance) bestGuess = (null, null, null, null, 1000f);
+
+                foreach (ColorCluster blueCluster in sortedByBlue)
                 {
-                    g.FillEllipse(System.Drawing.Brushes.DarkRed, redPoint.X - 5, redPoint.Y - 5, 10, 10);
-                    g.FillEllipse(System.Drawing.Brushes.DarkGreen, greenPoint.X - 5, greenPoint.Y - 5, 10, 10);
-                    g.FillEllipse(System.Drawing.Brushes.DarkBlue, bluePoint.X - 5, bluePoint.Y - 5, 10, 10);
-                    g.FillEllipse(System.Drawing.Brushes.White, blackPoint.X - 5, blackPoint.Y - 5, 10, 10);
+                    foreach (ColorCluster greenCluster in sortedByGreen)
+                    {
+                        if (greenCluster == blueCluster)
+                        {
+                            continue;
+                        }
+
+                        var rotatedPoints = RotatePoints90DegAroundOrigo(blueCluster.CenterPoint, greenCluster.CenterPoint);
+                        PointF blueRotatedPoint = rotatedPoints.a;
+                        PointF greenRotatedPoint = rotatedPoints.b;
+
+                        const float MAX_ACCEPTED_DISTANCE = 20;
+
+                        bool foundPair = false;
+                        float averageDistance = 0;
+                        ColorCluster chosenRedCluster = null;
+                        ColorCluster chosenBlackCluster = null;
+
+                        foreach (ColorCluster redCluster in sortedByRed)
+                        {
+                            if (redCluster == blueCluster || 
+                                redCluster == greenCluster)
+                            {
+                                continue;
+                            }
+
+                            float redDistance = DistanceFromLineToPoint(blueRotatedPoint, greenRotatedPoint, redCluster.CenterPoint);
+                            if (redDistance <= MAX_ACCEPTED_DISTANCE)
+                            {
+                                foreach (ColorCluster blackCluster in sortedByBlack)
+                                {
+                                    if (blackCluster == blueCluster ||
+                                        blackCluster == greenCluster ||
+                                        blackCluster == redCluster)
+                                    {
+                                        continue;
+                                    }
+
+                                    float blackDistance = DistanceFromLineToPoint(blueRotatedPoint, greenRotatedPoint, blackCluster.CenterPoint);
+                                    if (blackDistance <= MAX_ACCEPTED_DISTANCE)
+                                    {
+                                        foundPair = true;
+                                        averageDistance = (redDistance + blackDistance) / 2;
+
+                                        float centerX = (blueCluster.CenterPoint.X + greenCluster.CenterPoint.X) / 2;
+                                        float centerY = (blueCluster.CenterPoint.Y + greenCluster.CenterPoint.Y) / 2;
+
+                                        float redDistanceToBlueGreenCenter = (float)Math.Sqrt(Math.Pow(redCluster.CenterPoint.X - centerX, 2) + Math.Pow(redCluster.CenterPoint.Y - centerY, 2));
+                                        float blackDistanceToBlueGreenCenter = (float)Math.Sqrt(Math.Pow(blackCluster.CenterPoint.X - centerX, 2) + Math.Pow(blackCluster.CenterPoint.Y - centerY, 2));
+
+                                        if (blackDistanceToBlueGreenCenter < redDistanceToBlueGreenCenter)
+                                        {
+                                            chosenRedCluster = redCluster;
+                                            chosenBlackCluster = blackCluster;
+                                        }
+                                        else
+                                        {
+                                            chosenRedCluster = blackCluster;
+                                            chosenBlackCluster = redCluster;
+                                        }
+                                        goto forLoopsEnd;
+                                    }
+                                }
+                            }
+                        }
+
+                        forLoopsEnd:
+                        if (foundPair)
+                        {
+                            if (averageDistance < bestGuess.distance)
+                            {
+                                bestGuess = (chosenRedCluster, greenCluster, blueCluster, chosenBlackCluster, averageDistance);
+                            }
+                        }
+                    }
+                }
+
+                if (bestGuess.red != null)
+                {
+                    using (Graphics g = Graphics.FromImage(withClusters))
+                    {
+                        System.Drawing.Pen pen = new System.Drawing.Pen(System.Drawing.Brushes.White, 10);
+
+                        g.DrawLine(pen, bestGuess.black.CenterPoint, bestGuess.red.CenterPoint);
+                        g.DrawLine(pen, bestGuess.black.CenterPoint, bestGuess.green.CenterPoint);
+                        g.DrawLine(pen, bestGuess.black.CenterPoint, bestGuess.blue.CenterPoint);
+                    }
                 }
 
                 Dispatcher.Invoke(() => infoWindow.ImageViewer.Source = Convert(withClusters));
