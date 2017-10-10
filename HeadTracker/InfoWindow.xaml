@@ -19,10 +19,13 @@
             <Slider Name="AllowedDistanceSlider" HorizontalAlignment="Left"  Minimum="50" Maximum="300" Width="100" Margin="5,5,5,5"/>
             <TextBlock Name="ClusterCreationTime" HorizontalAlignment="Left" Width="100"/>
             <TextBlock Name="ClusterCount" HorizontalAlignment="Left" Width="100"/>
+            <TextBlock Name="TargetOffset" HorizontalAlignment="Left" Width="100"/>
             <ComboBox Name="ClusterView" Margin="5,5,5,5">
                 <ComboBoxItem IsSelected="True">Show clusters</ComboBoxItem>
                 <ComboBoxItem>Show distances</ComboBoxItem>
+                <ComboBoxItem>Show image</ComboBoxItem>
             </ComboBox>
+            <CheckBox Name="UseNoiseRemoval" IsChecked="True" Content="Remove noise" Margin="5,5,5,5"/>
 
         </StackPanel>
         <Image Name="ImageViewer" Grid.Column="1" Grid.Row="0"/>

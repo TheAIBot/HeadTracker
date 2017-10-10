@@ -202,7 +202,7 @@ namespace Tests
         private void CompateClusterMaps(Bitmap image, int[] expectedClusterMap)
         {
             ColorClusterCreator clusterCreator = new ColorClusterCreator(image.Width, image.Height);
-            clusterCreator.SetUseNouseRemoval(false);
+            clusterCreator.SetUseNoiseRemoval(false);
             clusterCreator.UpdateClusters(image);
 
             int[] actualClusterMap = clusterCreator.GetClusterMap();
