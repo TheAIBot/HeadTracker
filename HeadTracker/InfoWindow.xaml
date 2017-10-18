@@ -26,6 +26,7 @@
                 <ComboBoxItem>Show image</ComboBoxItem>
             </ComboBox>
             <CheckBox Name="UseNoiseRemoval" IsChecked="True" Content="Remove noise" Margin="5,5,5,5"/>
+            <CheckBox Name="UseGausBlur" IsChecked="True" Content="Use gauss blur" Margin="5,5,5,5"/>
 
         </StackPanel>
         <Image Name="ImageViewer" Grid.Column="1" Grid.Row="0"/>

@@ -202,6 +202,7 @@ namespace Tests
         private void CompateClusterMaps(Bitmap image, int[] expectedClusterMap)
         {
             ColorClusterCreator clusterCreator = new ColorClusterCreator(image.Width, image.Height);
+            clusterCreator.SetUseGaussBlur(false);
             clusterCreator.SetUseNoiseRemoval(false);
             clusterCreator.UpdateClusters(image);
 
@@ -211,8 +212,10 @@ namespace Tests
             for (int i = 0; i < expectedClusterMap.Length; i++)
             {
                 Assert.AreEqual(expectedClusterMap[i], actualClusterMap[i], "Maps doesn't match." + Environment.NewLine + 
-                                                                            "Expected: " + Environment.NewLine + ClusterMapAsString(expectedClusterMap, image.Width, image.Height) + Environment.NewLine + 
-                                                                            "Actual: " + Environment.NewLine + ClusterMapAsString(actualClusterMap, image.Width, image.Height));
+                                                                            "Expected: " + Environment.NewLine + 
+                                                                            ClusterMapAsString(expectedClusterMap, image.Width, image.Height) + Environment.NewLine + 
+                                                                            "Actual: " + Environment.NewLine + 
+                                                                            ClusterMapAsString(actualClusterMap, image.Width, image.Height));
             }
         }
 

@@ -43,21 +43,21 @@ namespace HeadTracker
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            Bitmap test = new Bitmap("balls1.png");
-            ct = new ColorClusterCreator(test.Width, test.Height);
+            //Bitmap test = new Bitmap("balls1.png");
+            //ct = new ColorClusterCreator(test.Width, test.Height);
 
-            Stopwatch w = new Stopwatch();
-            w.Start();
-            ct.SetColorDistance(14);
-            //for (int i = 0; i < 1; i++)
-            //{
-                ct.UpdateClusters(test);
-                ct.BitmapFromClusterMap();
-            //}
+            //Stopwatch w = new Stopwatch();
+            //w.Start();
+            //ct.SetColorDistance(14);
+            ////for (int i = 0; i < 1; i++)
+            ////{
+            //    ct.UpdateClusters(test);
+            //    ct.BitmapFromClusterMap();
+            ////}
 
-            w.Stop();
-            ct.BitmapFromClusterMap().Save("testResult.png");
-            MessageBox.Show(w.ElapsedMilliseconds.ToString());
+            //w.Stop();
+            //ct.BitmapFromClusterMap().Save("testResult.png");
+            //MessageBox.Show(w.ElapsedMilliseconds.ToString());
 
 
             FilterInfoCollection videoSources = new FilterInfoCollection(FilterCategory.VideoInputDevice);
@@ -93,13 +93,14 @@ namespace HeadTracker
 
             ct = new ColorClusterCreator(videoSource.VideoResolution.FrameSize.Width, videoSource.VideoResolution.FrameSize.Height);
 
-            videoSource.NewFrame += new AForge.Video.NewFrameEventHandler(videoSource_NewFrame);
+            videoSource.NewFrame += new AForge.Video.NewFrameEventHandler(VideoSource_NewFrame);
             videoSource.Start();
 
             infoWindow.Show();
             infoWindow.AllowedDistanceSlider.ValueChanged += (se, ev) => ct.SetColorDistance((float)ev.NewValue / 100.0f);
             infoWindow.ClusterView.SelectionChanged += (se, ev) => ct.SetClusterViewType((ClusterViewTypes)((ComboBox)se).SelectedIndex);
             infoWindow.UseNoiseRemoval.Click += (se, ev) => ct.SetUseNoiseRemoval((bool)infoWindow.UseNoiseRemoval.IsChecked);
+            infoWindow.UseGausBlur.Click += (se, ev) => ct.SetUseGaussBlur((bool)infoWindow.UseGausBlur.IsChecked);
             infoWindow.Closed += (se, ev) => this.Close();
         }
 
@@ -154,7 +155,7 @@ namespace HeadTracker
             return (new PointF(rotatedAX, rotatedAY), new PointF(rotatedBX, rotatedBY));
         }
 
-        private void videoSource_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
+        private void VideoSource_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
         {
             if (SkippedFrames < FRAMES_TO_SKIP)
             {
